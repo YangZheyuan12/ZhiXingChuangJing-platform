@@ -1,0 +1,2516 @@
+openapi: 3.0.3
+info:
+  title: 知行创境教育创作平台 API
+  version: 1.0.0
+  description: |
+    基于《知行创境》教育创作平台 V2.0 PRD 整理的后端接口 OpenAPI 文档。
+    基础路径为 `/api/v1`，认证方式为 Bearer Token。
+servers:
+  - url: /api/v1
+    description: Default API Server
+tags:
+  - name: Auth
+    description: 认证与账户
+  - name: Dashboard
+    description: 首页工作台
+  - name: Classes
+    description: 班级与公告
+  - name: Tasks
+    description: 课程与任务中心
+  - name: Exhibitions
+    description: 创作中心与展厅管理
+  - name: Assets
+    description: 媒体素材
+  - name: DigitalHuman
+    description: AI 数字人
+  - name: Museum
+    description: 博物馆资源
+  - name: Submissions
+    description: 提交与教师评价
+  - name: Community
+    description: 社区展厅与评论互动
+  - name: Users
+    description: 个人中心
+  - name: Notifications
+    description: 消息通知
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginData'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: 获取当前用户信息
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserProfile'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /users/me/profile:
+    put:
+      tags: [Auth]
+      summary: 修改个人资料
+      operationId: updateMyProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /users/me/password:
+    put:
+      tags: [Auth]
+      summary: 修改密码
+      operationId: updateMyPassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /dashboard/overview:
+    get:
+      tags: [Dashboard]
+      summary: 获取首页工作台数据
+      operationId: getDashboardOverview
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: role
+          schema:
+            $ref: '#/components/schemas/UserRole'
+          description: 前端按角色切换视图时传入
+      responses:
+        '200':
+          description: 工作台数据
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardOverview'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /classes:
+    get:
+      tags: [Classes]
+      summary: 获取我的班级列表
+      operationId: getMyClasses
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 班级列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ClassInfo'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /classes/{classId}:
+    get:
+      tags: [Classes]
+      summary: 获取班级详情
+      operationId: getClassDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 班级详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ClassDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /classes/{classId}/members:
+    get:
+      tags: [Classes]
+      summary: 获取班级成员
+      operationId: getClassMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 班级成员列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ClassMember'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /classes/{classId}/announcements:
+    get:
+      tags: [Classes]
+      summary: 获取班级公告列表
+      operationId: getClassAnnouncements
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 公告列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Announcement'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Classes]
+      summary: 发布班级公告
+      operationId: createAnnouncement
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnnouncementRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Announcement'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: 获取任务列表
+      operationId: getTasks
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - in: query
+          name: classId
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: keyword
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 任务分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PagedTaskSummary'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Tasks]
+      summary: 创建任务
+      operationId: createTask
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tasks/{taskId}:
+    get:
+      tags: [Tasks]
+      summary: 获取任务详情
+      operationId: getTaskDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 任务详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Tasks]
+      summary: 更新任务
+      operationId: updateTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tasks/{taskId}/excellent-exhibitions:
+    get:
+      tags: [Tasks]
+      summary: 获取任务优秀作品
+      operationId: getExcellentExhibitionsByTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 优秀作品列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ExhibitionSummary'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tasks/{taskId}/progress:
+    get:
+      tags: [Tasks]
+      summary: 教师查看任务进度
+      operationId: getTaskProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 任务进度
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskProgress'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tasks/{taskId}/submit:
+    post:
+      tags: [Submissions]
+      summary: 提交任务作品
+      operationId: submitTaskWork
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmissionRequest'
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmissionDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tasks/{taskId}/submissions:
+    get:
+      tags: [Submissions]
+      summary: 获取任务提交记录
+      operationId: getTaskSubmissions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: 提交记录列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubmissionDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions:
+    get:
+      tags: [Exhibitions]
+      summary: 获取我的展厅列表
+      operationId: getMyExhibitions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: taskId
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/ExhibitionStatus'
+        - in: query
+          name: keyword
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 展厅分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PagedExhibitionSummary'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Exhibitions]
+      summary: 创建展厅
+      operationId: createExhibition
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExhibitionRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExhibitionDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions/{exhibitionId}:
+    get:
+      tags: [Exhibitions]
+      summary: 获取展厅详情
+      operationId: getExhibitionDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          description: 展厅详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExhibitionDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Exhibitions]
+      summary: 更新展厅基础信息
+      operationId: updateExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExhibitionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions/{exhibitionId}/members:
+    get:
+      tags: [Exhibitions]
+      summary: 获取协作者列表
+      operationId: getExhibitionMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          description: 协作者列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ExhibitionMember'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Exhibitions]
+      summary: 邀请协作者
+      operationId: addExhibitionMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddExhibitionMembersRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions/{exhibitionId}/versions:
+    get:
+      tags: [Exhibitions]
+      summary: 获取版本历史
+      operationId: getExhibitionVersions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          description: 版本历史列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ExhibitionVersion'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Exhibitions]
+      summary: 保存展厅版本
+      operationId: saveExhibitionVersion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveExhibitionVersionRequest'
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExhibitionVersion'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions/{exhibitionId}/viewer:
+    get:
+      tags: [Exhibitions]
+      summary: 获取观众预览数据
+      operationId: getExhibitionViewer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          description: 观众模式数据
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExhibitionViewerData'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions/{exhibitionId}/publish:
+    post:
+      tags: [Exhibitions]
+      summary: 发布展厅
+      operationId: publishExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishExhibitionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /exhibitions/{exhibitionId}/digital-human:
+    get:
+      tags: [DigitalHuman]
+      summary: 获取展厅数字人详情
+      operationId: getExhibitionDigitalHuman
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          description: 数字人详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DigitalHuman'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [DigitalHuman]
+      summary: 创建或更新数字人
+      operationId: upsertExhibitionDigitalHuman
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertDigitalHumanRequest'
+      responses:
+        '200':
+          description: 保存成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DigitalHuman'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /assets/upload:
+    post:
+      tags: [Assets]
+      summary: 上传素材
+      operationId: uploadAsset
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folder:
+                  type: string
+                  example: exhibition
+                bizType:
+                  type: string
+                  example: exhibition_material
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssetUploadData'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /assets:
+    get:
+      tags: [Assets]
+      summary: 获取我的素材列表
+      operationId: getAssets
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: assetType
+          schema:
+            $ref: '#/components/schemas/AssetType'
+        - in: query
+          name: sourceType
+          schema:
+            $ref: '#/components/schemas/AssetSourceType'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 素材分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PagedAsset'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /digital-humans/{digitalHumanId}/equipments:
+    post:
+      tags: [DigitalHuman]
+      summary: 绑定博物馆装备
+      operationId: addDigitalHumanEquipment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DigitalHumanId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindEquipmentRequest'
+      responses:
+        '200':
+          description: 绑定成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DigitalHumanEquipment'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /digital-humans/{digitalHumanId}/equipments/{equipmentId}:
+    delete:
+      tags: [DigitalHuman]
+      summary: 删除已绑定装备
+      operationId: deleteDigitalHumanEquipment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DigitalHumanId'
+        - $ref: '#/components/parameters/EquipmentId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /museum/resources:
+    get:
+      tags: [Museum]
+      summary: 获取博物馆资源列表
+      operationId: getMuseumResources
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: providerCode
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: keyword
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 文博资源分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PagedMuseumResource'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Museum]
+      summary: 同步博物馆资源
+      operationId: syncMuseumResources
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncMuseumResourcesRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /museum/resources/{resourceId}:
+    get:
+      tags: [Museum]
+      summary: 获取博物馆资源详情
+      operationId: getMuseumResourceDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: 文博资源详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MuseumResource'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /submissions/{submissionId}:
+    get:
+      tags: [Submissions]
+      summary: 获取提交详情
+      operationId: getSubmissionDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SubmissionId'
+      responses:
+        '200':
+          description: 提交详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmissionDetail'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /submissions/{submissionId}/reviews:
+    post:
+      tags: [Submissions]
+      summary: 教师评分与点评
+      operationId: createSubmissionReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SubmissionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmissionReviewRequest'
+      responses:
+        '200':
+          description: 点评成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubmissionReview'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions:
+    get:
+      tags: [Community]
+      summary: 获取社区展厅列表
+      operationId: getCommunityExhibitions
+      parameters:
+        - in: query
+          name: keyword
+          schema:
+            type: string
+        - in: query
+          name: grade
+          schema:
+            type: string
+        - in: query
+          name: theme
+          schema:
+            type: string
+        - in: query
+          name: tag
+          schema:
+            type: string
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [latest, hot, likes]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 社区展厅分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PagedExhibitionSummary'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions/{exhibitionId}:
+    get:
+      tags: [Community]
+      summary: 获取社区展厅详情
+      operationId: getCommunityExhibitionDetail
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          description: 社区展厅详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExhibitionViewerData'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions/{exhibitionId}/like:
+    post:
+      tags: [Community]
+      summary: 点赞展厅
+      operationId: likeExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Community]
+      summary: 取消点赞
+      operationId: unlikeExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions/{exhibitionId}/favorite:
+    post:
+      tags: [Community]
+      summary: 收藏展厅
+      operationId: favoriteExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Community]
+      summary: 取消收藏
+      operationId: unfavoriteExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions/{exhibitionId}/share:
+    post:
+      tags: [Community]
+      summary: 记录分享
+      operationId: shareExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareExhibitionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions/{exhibitionId}/comments:
+    get:
+      tags: [Community]
+      summary: 获取评论列表
+      operationId: getExhibitionComments
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 评论列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentSection'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Community]
+      summary: 发表评论
+      operationId: createExhibitionComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '200':
+          description: 评论成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Comment'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /community/exhibitions/{exhibitionId}/feature:
+    post:
+      tags: [Community]
+      summary: 教师推荐到社区首页
+      operationId: featureExhibition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ExhibitionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeatureExhibitionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /users/{userId}/homepage:
+    get:
+      tags: [Users]
+      summary: 获取个人主页
+      operationId: getUserHomepage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: 个人主页
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserHomepage'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /users/me/portfolio:
+    get:
+      tags: [Users]
+      summary: 获取我的作品集
+      operationId: getMyPortfolio
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 作品集列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PortfolioItem'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: 获取通知列表
+      operationId: getNotifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: readStatus
+          schema:
+            type: string
+            enum: [unread, read]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: 通知分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PagedNotification'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /notifications/read:
+    post:
+      tags: [Notifications]
+      summary: 标记通知已读
+      operationId: readNotifications
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReadNotificationsRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      in: query
+      name: pageSize
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    ClassId:
+      in: path
+      name: classId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    TaskId:
+      in: path
+      name: taskId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ExhibitionId:
+      in: path
+      name: exhibitionId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    UserId:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    DigitalHumanId:
+      in: path
+      name: digitalHumanId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    EquipmentId:
+      in: path
+      name: equipmentId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ResourceId:
+      in: path
+      name: resourceId
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SubmissionId:
+      in: path
+      name: submissionId
+      required: true
+      schema:
+        type: integer
+        format: int64
+  responses:
+    SuccessResponse:
+      description: 操作成功
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 0
+            message: ok
+            data: {}
+            requestId: 4f9b6e24e2ef4f4f9d6c
+    ErrorResponse:
+      description: 业务异常
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorized:
+              value:
+                code: 40100
+                message: 未登录或 token 失效
+                data: null
+                requestId: 4f9b6e24e2ef4f4f9d6c
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+        requestId:
+          type: string
+      required: [code, message, requestId]
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 40001
+        message:
+          type: string
+          example: 参数错误
+        data:
+          nullable: true
+        requestId:
+          type: string
+      required: [code, message, requestId]
+
+    UserRole:
+      type: string
+      enum: [student, teacher, parent, admin, visitor]
+    TaskStatus:
+      type: string
+      enum: [draft, published, closed, archived]
+    ExhibitionStatus:
+      type: string
+      enum: [draft, published, archived]
+    ExhibitionVisibility:
+      type: string
+      enum: [private, class, public]
+    SubmissionStatus:
+      type: string
+      enum: [submitted, reviewed, returned]
+    AssetType:
+      type: string
+      enum: [image, video, audio, document, model]
+    AssetSourceType:
+      type: string
+      enum: [upload, platform, museum]
+
+    SchoolInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    ClassInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        grade:
+          type: string
+        academicYear:
+          type: string
+
+    SimpleUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        role:
+          $ref: '#/components/schemas/UserRole'
+        name:
+          type: string
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        role:
+          $ref: '#/components/schemas/UserRole'
+        realName:
+          type: string
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+        bio:
+          type: string
+        school:
+          $ref: '#/components/schemas/SchoolInfo'
+        classInfo:
+          $ref: '#/components/schemas/ClassInfo'
+
+    ClassDetail:
+      allOf:
+        - $ref: '#/components/schemas/ClassInfo'
+        - type: object
+          properties:
+            school:
+              $ref: '#/components/schemas/SchoolInfo'
+            headTeacher:
+              $ref: '#/components/schemas/SimpleUser'
+            memberCount:
+              type: integer
+
+    ClassMember:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        role:
+          type: string
+          enum: [student, teacher, assistant]
+        realName:
+          type: string
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        joinedAt:
+          type: string
+          format: date-time
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        classId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        content:
+          type: string
+        pinned:
+          type: boolean
+        publisher:
+          $ref: '#/components/schemas/SimpleUser'
+        publishedAt:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required: [account, password]
+      properties:
+        account:
+          type: string
+        password:
+          type: string
+          format: password
+    LoginData:
+      type: object
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        user:
+          $ref: '#/components/schemas/SimpleUser'
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        bio:
+          type: string
+    UpdatePasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+          format: password
+        newPassword:
+          type: string
+          format: password
+    CreateAnnouncementRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        pinned:
+          type: boolean
+          default: false
+
+    TaskMaterial:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        materialType:
+          type: string
+          enum: [image, video, audio, link, document]
+        url:
+          type: string
+          format: uri
+        description:
+          type: string
+    TaskSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        description:
+          type: string
+        teacher:
+          $ref: '#/components/schemas/SimpleUser'
+        startTime:
+          type: string
+          format: date-time
+        dueTime:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+    TaskDetail:
+      allOf:
+        - $ref: '#/components/schemas/TaskSummary'
+        - type: object
+          properties:
+            evaluationCriteria:
+              type: string
+            backgroundMaterials:
+              type: array
+              items:
+                $ref: '#/components/schemas/TaskMaterial'
+            targetClasses:
+              type: array
+              items:
+                $ref: '#/components/schemas/ClassInfo'
+            excellentExhibitions:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExhibitionSummary'
+    CreateTaskRequest:
+      type: object
+      required: [title, description, dueTime, targetClassIds]
+      properties:
+        title:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        description:
+          type: string
+        backgroundMaterials:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskMaterial'
+        evaluationCriteria:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        dueTime:
+          type: string
+          format: date-time
+        targetClassIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    UpdateTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateTaskRequest'
+    TaskProgressGroup:
+      type: object
+      properties:
+        exhibitionId:
+          type: integer
+          format: int64
+        groupName:
+          type: string
+        leaderName:
+          type: string
+        memberCount:
+          type: integer
+        progressPercent:
+          type: integer
+        submissionStatus:
+          $ref: '#/components/schemas/SubmissionStatus'
+        updatedAt:
+          type: string
+          format: date-time
+    TaskProgress:
+      type: object
+      properties:
+        taskId:
+          type: integer
+          format: int64
+        submittedCount:
+          type: integer
+        reviewedCount:
+          type: integer
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskProgressGroup'
+
+    ExhibitionStats:
+      type: object
+      properties:
+        viewCount:
+          type: integer
+        likeCount:
+          type: integer
+        favoriteCount:
+          type: integer
+        commentCount:
+          type: integer
+    ExhibitionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        taskId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        summary:
+          type: string
+        status:
+          $ref: '#/components/schemas/ExhibitionStatus'
+        visibility:
+          $ref: '#/components/schemas/ExhibitionVisibility'
+        groupName:
+          type: string
+        ownerId:
+          type: integer
+          format: int64
+        author:
+          $ref: '#/components/schemas/SimpleUser'
+        latestVersionNo:
+          type: integer
+        publishedVersionNo:
+          type: integer
+        stats:
+          $ref: '#/components/schemas/ExhibitionStats'
+        tags:
+          type: array
+          items:
+            type: string
+    ExhibitionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ExhibitionSummary'
+        - type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+            collaborators:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExhibitionMember'
+    ExhibitionMember:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+        name:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        joinedAt:
+          type: string
+          format: date-time
+    CreateExhibitionRequest:
+      type: object
+      required: [title]
+      properties:
+        taskId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        summary:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        visibility:
+          $ref: '#/components/schemas/ExhibitionVisibility'
+        groupName:
+          type: string
+    UpdateExhibitionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        visibility:
+          $ref: '#/components/schemas/ExhibitionVisibility'
+    AddExhibitionMembersRequest:
+      type: object
+      required: [memberUserIds, role]
+      properties:
+        memberUserIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        role:
+          type: string
+          enum: [owner, editor, viewer]
+
+    CanvasConfig:
+      type: object
+      properties:
+        width:
+          type: integer
+        height:
+          type: integer
+        background:
+          type: string
+        zoom:
+          type: number
+          format: double
+    ExhibitionElement:
+      type: object
+      properties:
+        componentType:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        props:
+          type: object
+          additionalProperties: true
+    ExhibitionRenderData:
+      type: object
+      properties:
+        canvasConfig:
+          $ref: '#/components/schemas/CanvasConfig'
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExhibitionElement'
+    SaveExhibitionVersionRequest:
+      type: object
+      required: [saveType, canvasConfig, versionData]
+      properties:
+        saveType:
+          type: string
+          enum: [manual, autosave, publish]
+        versionNote:
+          type: string
+        canvasConfig:
+          $ref: '#/components/schemas/CanvasConfig'
+        versionData:
+          $ref: '#/components/schemas/ExhibitionRenderData'
+    ExhibitionVersion:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        versionNo:
+          type: integer
+        saveType:
+          type: string
+        versionNote:
+          type: string
+        canvasConfig:
+          $ref: '#/components/schemas/CanvasConfig'
+        elementCount:
+          type: integer
+        versionData:
+          $ref: '#/components/schemas/ExhibitionRenderData'
+        createdBy:
+          $ref: '#/components/schemas/SimpleUser'
+        createdAt:
+          type: string
+          format: date-time
+    PublishExhibitionRequest:
+      type: object
+      required: [versionNo, visibility]
+      properties:
+        versionNo:
+          type: integer
+        visibility:
+          $ref: '#/components/schemas/ExhibitionVisibility'
+
+    AssetUploadData:
+      type: object
+      properties:
+        assetId:
+          type: integer
+          format: int64
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+          format: uri
+        mimeType:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+    Asset:
+      allOf:
+        - $ref: '#/components/schemas/AssetUploadData'
+        - type: object
+          properties:
+            assetType:
+              $ref: '#/components/schemas/AssetType'
+            sourceType:
+              $ref: '#/components/schemas/AssetSourceType'
+            createdAt:
+              type: string
+              format: date-time
+
+    StoryTimelineItem:
+      type: object
+      properties:
+        anchorCode:
+          type: string
+        startSecond:
+          type: integer
+        endSecond:
+          type: integer
+        content:
+          type: string
+    DigitalHumanEquipment:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        slotCode:
+          type: string
+        anchorCode:
+          type: string
+        displayOrder:
+          type: integer
+        resourceId:
+          type: integer
+          format: int64
+        resourceTitle:
+          type: string
+        museumName:
+          type: string
+        resourceSnapshot:
+          type: object
+          additionalProperties: true
+    DigitalHuman:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        exhibitionId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        avatar2dUrl:
+          type: string
+          format: uri
+        model3dUrl:
+          type: string
+          format: uri
+        persona:
+          type: string
+        voiceType:
+          type: string
+        storyScript:
+          type: string
+        storyTimeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryTimelineItem'
+        equippedItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/DigitalHumanEquipment'
+    UpsertDigitalHumanRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        avatar2dUrl:
+          type: string
+          format: uri
+        model3dUrl:
+          type: string
+          format: uri
+        persona:
+          type: string
+        voiceType:
+          type: string
+        storyScript:
+          type: string
+        storyTimeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryTimelineItem'
+    BindEquipmentRequest:
+      type: object
+      required: [slotCode, museumResourceId]
+      properties:
+        slotCode:
+          type: string
+        museumResourceId:
+          type: integer
+          format: int64
+        displayOrder:
+          type: integer
+        anchorCode:
+          type: string
+
+    MuseumResource:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        providerCode:
+          type: string
+        title:
+          type: string
+        category:
+          type: string
+        museumName:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        detailUrl:
+          type: string
+          format: uri
+        description:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    SyncMuseumResourcesRequest:
+      type: object
+      required: [providerCode]
+      properties:
+        providerCode:
+          type: string
+        category:
+          type: string
+        keyword:
+          type: string
+
+    CreateSubmissionRequest:
+      type: object
+      required: [exhibitionId]
+      properties:
+        exhibitionId:
+          type: integer
+          format: int64
+        submitRemark:
+          type: string
+    SubmissionReview:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        reviewer:
+          $ref: '#/components/schemas/SimpleUser'
+        score:
+          type: number
+          format: double
+        commentText:
+          type: string
+        commentAudioUrl:
+          type: string
+          format: uri
+        isPublic:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    SubmissionDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        taskId:
+          type: integer
+          format: int64
+        exhibitionId:
+          type: integer
+          format: int64
+        submitter:
+          $ref: '#/components/schemas/SimpleUser'
+        versionNo:
+          type: integer
+        submitRemark:
+          type: string
+        submissionStatus:
+          $ref: '#/components/schemas/SubmissionStatus'
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        reviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionReview'
+    CreateSubmissionReviewRequest:
+      type: object
+      properties:
+        score:
+          type: number
+          format: double
+        commentText:
+          type: string
+        commentAudioUrl:
+          type: string
+          format: uri
+        isPublic:
+          type: boolean
+          default: true
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        exhibitionId:
+          type: integer
+          format: int64
+        user:
+          $ref: '#/components/schemas/SimpleUser'
+        parentCommentId:
+          type: integer
+          format: int64
+          nullable: true
+        content:
+          type: string
+        mentionUsers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleUser'
+        createdAt:
+          type: string
+          format: date-time
+    CommentSection:
+      type: object
+      properties:
+        teacherReviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionReview'
+        studentComments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+    CreateCommentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        parentCommentId:
+          type: integer
+          format: int64
+          nullable: true
+        mentionUserIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+    ShareExhibitionRequest:
+      type: object
+      required: [channel]
+      properties:
+        channel:
+          type: string
+          example: wechat
+    FeatureExhibitionRequest:
+      type: object
+      required: [featured]
+      properties:
+        featured:
+          type: boolean
+        featuredReason:
+          type: string
+
+    UserHomepageStats:
+      type: object
+      properties:
+        exhibitionCount:
+          type: integer
+        likeCount:
+          type: integer
+        teacherPraiseCount:
+          type: integer
+    PortfolioItem:
+      type: object
+      properties:
+        exhibitionId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        coverUrl:
+          type: string
+          format: uri
+        publishedAt:
+          type: string
+          format: date-time
+        likeCount:
+          type: integer
+    UserHomepage:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        stats:
+          $ref: '#/components/schemas/UserHomepageStats'
+        portfolio:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioItem'
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        notificationType:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        bizType:
+          type: string
+        bizId:
+          type: integer
+          format: int64
+        readStatus:
+          type: string
+          enum: [unread, read]
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+    ReadNotificationsRequest:
+      type: object
+      required: [notificationIds]
+      properties:
+        notificationIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    ExhibitionViewerData:
+      type: object
+      properties:
+        exhibition:
+          $ref: '#/components/schemas/ExhibitionDetail'
+        renderData:
+          $ref: '#/components/schemas/ExhibitionRenderData'
+        digitalHuman:
+          $ref: '#/components/schemas/DigitalHuman'
+        teacherReviews:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionReview'
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+
+    DashboardOverview:
+      type: object
+      properties:
+        ongoingTasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskSummary'
+        recentExhibitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExhibitionSummary'
+        announcements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Announcement'
+        activityFeeds:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityFeed'
+        recommendedResources:
+          type: array
+          items:
+            $ref: '#/components/schemas/MuseumResource'
+        featuredExhibitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExhibitionSummary'
+    ActivityFeed:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          example: exhibition_published
+        content:
+          type: string
+        operator:
+          $ref: '#/components/schemas/SimpleUser'
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedTaskSummary:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PagedExhibitionSummary:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExhibitionSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PagedAsset:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PagedMuseumResource:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/MuseumResource'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    PagedNotification:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer

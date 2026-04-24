@@ -1,0 +1,206 @@
+================================================================
+知行创境教育创作平台 - 本地启动流程
+================================================================
+适用环境: Windows 11 + PowerShell
+项目根目录: D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
+编写日期: 2026-04-24
+================================================================
+
+
+【一、前置依赖检查】
+----------------------------------------------------------------
+打开 PowerShell，依次执行下列命令确认环境:
+
+    java -version          # 需要 JDK 17 或更高 (已验证 17/22 均可)
+    mvn -v                 # Maven 3.9+
+    node -v                # Node 18+ (已验证 v24.11)
+    npm -v                 # npm 9+
+
+检查三个服务是否运行:
+
+    Get-Service MySQL                                  # 状态应为 Running
+    Get-Process redis-server -ErrorAction SilentlyContinue   # 有返回即 Redis 在跑
+    Get-NetTCPConnection -LocalPort 3306,6379 -ErrorAction SilentlyContinue
+
+若 MySQL 没跑:
+    Start-Service MySQL
+
+若 Redis 没跑:
+    # 自己找到 redis-server.exe 的位置手动启动，或装成 Windows 服务
+
+
+【二、首次启动（只做一次）】
+----------------------------------------------------------------
+
+## 2.1 初始化 MySQL 数据库 ##
+
+在项目根目录执行:
+
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
+    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' --default-character-set=utf8mb4 -e "source deploy/mysql/init.sql"
+
+注意:
+  - PowerShell 下 -h 和 -P 参数必须加单引号，否则会被解析错
+  - 若 root 密码不是 123456，请先改 application-dev.yml 里的密码或改 MySQL 密码
+  - 初始化脚本位置: deploy/mysql/init.sql
+  - 执行完后会创建 zhixingchuangjing 库 + 24 张表 + 种子账号
+
+验证:
+    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "USE zhixingchuangjing; SHOW TABLES;"
+
+
+## 2.2 后端首次打包（下载 Maven 依赖 + 打 fat jar）##
+
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
+    mvn -DskipTests package
+
+首次运行会下载大量依赖，慢的时候要 5-10 分钟，耐心等
+成功后会生成:
+    backend\target\platform-backend-0.0.1-SNAPSHOT.jar
+
+
+## 2.3 前端安装依赖 ##
+
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\frontend
+    npm install
+
+
+## 2.4 （可选）启动 MinIO 对象存储 ##
+
+不启动的话，上传素材/头像/视频会失败，但登录、浏览、评论等功能正常。
+
+方式 A - Docker (推荐):
+    docker run -d --name zxcyj-minio -p 9000:9000 -p 9001:9001 `
+      -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin `
+      minio/minio:latest server /data --console-address ":9001"
+
+方式 B - 下载 minio.exe:
+    去 https://min.io/download 下载 Windows 版 minio.exe
+    执行: .\minio.exe server D:\minio-data --console-address ":9001"
+
+
+【三、日常启动（每次开发）】
+----------------------------------------------------------------
+开两个 PowerShell 窗口:
+
+## 窗口 1 - 启动后端 ##
+
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
+    java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
+
+看到 "Started ZhiXingChuangJingApplication in X seconds" 即启动完成
+后端地址: http://127.0.0.1:8080
+
+
+## 窗口 2 - 启动前端 ##
+
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\frontend
+    npm run dev
+
+看到 "VITE v5.x.x  ready in Xms" 和 Local: http://localhost:5173/ 即启动完成
+前端地址: http://localhost:5173
+
+
+## 浏览器打开 ##
+
+    http://localhost:5173
+
+
+【四、默认账号】
+----------------------------------------------------------------
+所有账号密码均为 123456
+
+    admin        - 管理员
+    teacher001   - 老师
+    student001   - 学生
+    student002   - 学生
+
+
+【五、修改后端代码后如何重启】
+----------------------------------------------------------------
+后端改了代码，必须重新打包才能生效:
+
+    # 先在运行后端的窗口按 Ctrl+C 停止
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
+    mvn -DskipTests package
+    java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
+
+前端改了代码无需手动重启，Vite 会自动热更新（HMR）。
+
+
+【六、常见坑 & 解决方案】
+----------------------------------------------------------------
+
+## 坑 1: ClassNotFoundException ZhiXingChuangJingApplication ##
+原因: 路径里有中文（"计算机设计大赛"），mvn spring-boot:run 在 fork 子进程时
+      Windows 命令行对中文参数解析异常
+解决: 不要用 mvn spring-boot:run，改用 java -jar 的方式启动
+
+
+## 坑 2: Java -D 参数报 "找不到主类 .encoding=UTF-8" ##
+原因: PowerShell 对 -D 开头的参数解析有问题
+解决: 给每个 -D 参数加单引号，例如:
+      java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar xxx.jar
+
+
+## 坑 3: Unable to determine Dialect without JDBC metadata ##
+原因: MySQL 连接失败 (库不存在 / 密码错 / MySQL 没起)
+解决:
+  1. 确认 MySQL 在 3306 监听:
+     Get-NetTCPConnection -LocalPort 3306
+  2. 确认能用 123456 登录:
+     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "SHOW DATABASES;"
+  3. 确认 zhixingchuangjing 库存在，不存在则执行 2.1 初始化
+
+
+## 坑 4: 前端 'vite' 不是内部或外部命令 ##
+原因: node_modules 不完整
+解决:
+    cd frontend
+    rm -r node_modules    # 或手动删除
+    npm install
+
+
+## 坑 5: MySQL 连接参数被 PowerShell 吃掉 ##
+例如 mysql -h127.0.0.1 -P3306 会报 "Unknown MySQL server host '127'"
+解决: 每个 - 开头的参数都加单引号:
+      mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "..."
+
+
+## 坑 6: 前端请求后端 CORS 失败 ##
+后端允许的 origin 在 backend/src/main/resources/application.yml 里:
+    app.cors.allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+如果用了别的端口访问前端，需要把新地址加进这个列表，然后重打包后端。
+
+
+【七、关闭服务】
+----------------------------------------------------------------
+在对应 PowerShell 窗口按 Ctrl+C 即可
+
+批量清理残留 Java / Node 进程:
+    Get-Process java,node -ErrorAction SilentlyContinue | Stop-Process -Force
+
+
+【八、快捷启动脚本（可选）】
+----------------------------------------------------------------
+把下面两段分别存成两个 .ps1 文件，双击或右键 "用 PowerShell 运行":
+
+### start-backend.ps1 ###
+Set-Location $PSScriptRoot\backend
+java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
+
+### start-frontend.ps1 ###
+Set-Location $PSScriptRoot\frontend
+npm run dev
+
+
+【九、端口分配总表】
+----------------------------------------------------------------
+    3306   MySQL
+    6379   Redis
+    9000   MinIO API          (可选)
+    9001   MinIO Console      (可选)
+    8080   Spring Boot 后端
+    5173   Vite 前端
+
+================================================================
