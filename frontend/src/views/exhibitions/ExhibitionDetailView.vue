@@ -15,6 +15,22 @@
       </template>
     </PageHero>
 
+    <div class="flex flex-wrap gap-3">
+      <router-link
+        :to="`/exhibitions/${exhibitionId}/editor`"
+        class="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-700"
+      >
+        ✎ 进入编辑器
+      </router-link>
+      <router-link
+        v-if="detail?.publishedVersionNo"
+        :to="`/exhibitions/${exhibitionId}/view`"
+        class="inline-flex items-center gap-2 rounded-2xl border border-brand-200 px-5 py-2.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
+      >
+        👁 观众浏览
+      </router-link>
+    </div>
+
     <div v-if="errorMessage" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
       {{ errorMessage }}
     </div>

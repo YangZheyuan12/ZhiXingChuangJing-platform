@@ -22,6 +22,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '展厅编辑器' },
   },
   {
+    path: '/exhibitions/:exhibitionId/view',
+    name: 'exhibition-viewer',
+    component: () => import('@/views/exhibitions/ExhibitionViewer.vue'),
+    meta: { title: '展厅浏览' },
+  },
+  {
     path: '/admin',
     component: AdminLayout,
     meta: { adminOnly: true },
