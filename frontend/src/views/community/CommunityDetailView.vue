@@ -14,22 +14,28 @@
         <button
           type="button"
           :disabled="acting"
-          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition"
-          :class="liked ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-brand-200 text-brand-700 hover:bg-brand-50'"
+          class="action-btn"
+          :class="[liked ? 'action-btn-liked' : 'action-btn-default', { 'action-btn-bump': likeBumping }]"
           @click="handleLike"
         >
-          <span>{{ liked ? '♥' : '♡' }}</span>
-          点赞
+          <svg class="h-4 w-4" viewBox="0 0 24 24" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+          <span>点赞</span>
+          <span v-if="detail?.stats.likeCount !== undefined" class="ml-0.5 text-xs tabular-nums opacity-80">{{ detail.stats.likeCount }}</span>
         </button>
         <button
           type="button"
           :disabled="acting"
-          class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition"
-          :class="favorited ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-brand-200 text-brand-700 hover:bg-brand-50'"
+          class="action-btn"
+          :class="[favorited ? 'action-btn-favorited' : 'action-btn-default', { 'action-btn-bump': favoriteBumping }]"
           @click="handleFavorite"
         >
-          <span>{{ favorited ? '★' : '☆' }}</span>
-          收藏
+          <svg class="h-4 w-4" viewBox="0 0 24 24" :fill="favorited ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          <span>收藏</span>
+          <span v-if="detail?.stats.favoriteCount !== undefined" class="ml-0.5 text-xs tabular-nums opacity-80">{{ detail.stats.favoriteCount }}</span>
         </button>
         <button
           type="button"
@@ -99,11 +105,15 @@
     <section class="panel-card overflow-hidden">
       <div class="bg-[linear-gradient(160deg,#fffaf7,#f5e5d6)] px-6 py-6">
         <SectionHeader title="发表评论" description="支持直接评论和回复指定留言。" />
-        <div v-if="replyTarget" class="mb-4 rounded-2xl border border-brand-200 bg-white/80 px-4 py-3">
+        <div v-if="replyTarget || reviewReplyTarget" class="mb-4 rounded-2xl border border-brand-200 bg-white/80 px-4 py-3">
           <p class="text-xs uppercase tracking-[0.16em] text-brand-600">Replying</p>
-          <p class="mt-1 text-sm text-slate-600">
-            正在回复 {{ replyTarget.user.nickname || replyTarget.user.name }}：
+          <p v-if="replyTarget" class="mt-1 text-sm text-slate-600">
+            正在回复 <span class="font-medium text-brand-700">@{{ replyTarget.user.nickname || replyTarget.user.name }}</span>：
             {{ replyTarget.content }}
+          </p>
+          <p v-else-if="reviewReplyTarget" class="mt-1 text-sm text-slate-600">
+            正在回复老师 <span class="font-medium text-amber-700">@{{ reviewReplyTarget.reviewer.nickname || reviewReplyTarget.reviewer.name }}</span> 的点评
+            <span class="ml-1 text-xs text-slate-400">（{{ reviewReplyTarget.score ?? '--' }} 分）</span>
           </p>
           <button type="button" class="mt-3 text-sm text-brand-700 transition hover:text-brand-900" @click="clearReplyTarget">
             取消回复
@@ -180,7 +190,16 @@
                     <h4 class="font-medium text-slate-900">{{ review.reviewer.nickname || review.reviewer.name }}</h4>
                     <p class="mt-1 text-xs text-slate-400">{{ formatDateTime(review.createdAt) }}</p>
                   </div>
-                  <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-700">{{ review.score ?? '--' }} 分</span>
+                  <div class="flex items-center gap-2">
+                    <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-700">{{ review.score ?? '--' }} 分</span>
+                    <button
+                      type="button"
+                      class="rounded-full border border-amber-200 px-3 py-1 text-xs text-amber-700 transition hover:bg-amber-50"
+                      @click="setReplyToTeacher(review)"
+                    >
+                      回复点评
+                    </button>
+                  </div>
                 </div>
                 <p :class="getTextClass(reviewKey(review.id), review.commentText || '暂无点评内容', 4)" class="mt-3 text-sm leading-7 text-slate-600">
                   {{ review.commentText || '暂无点评内容' }}
@@ -193,6 +212,25 @@
                 >
                   {{ isExpanded(reviewKey(review.id)) ? '收起' : '展开查看更多' }}
                 </button>
+
+                <div v-if="teacherReplies(review.reviewer.id).length > 0" class="mt-4 rounded-2xl bg-amber-50/60 px-4 py-3">
+                  <p class="text-xs font-semibold tracking-wide text-amber-700">同学回复</p>
+                  <div class="mt-3 space-y-3">
+                    <div
+                      v-for="reply in teacherReplies(review.reviewer.id)"
+                      :key="reply.id"
+                      class="border-b border-amber-200/50 pb-3 last:border-b-0 last:pb-0"
+                    >
+                      <div class="flex flex-wrap items-center gap-2 text-sm">
+                        <span class="font-medium text-slate-900">{{ reply.user.nickname || reply.user.name }}</span>
+                        <span class="text-slate-400">回复老师</span>
+                        <span class="font-medium text-amber-700">@{{ review.reviewer.nickname || review.reviewer.name }}</span>
+                      </div>
+                      <p class="mt-1 text-xs text-slate-400">{{ formatDateTime(reply.createdAt) }}</p>
+                      <p class="mt-2 text-sm leading-6 text-slate-600">{{ reply.content }}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </article>
@@ -207,7 +245,12 @@
           description="还没有同学留言。"
         />
 
-        <div v-else class="space-y-6">
+        <TransitionGroup
+          v-else
+          tag="div"
+          name="comment-list"
+          class="space-y-6"
+        >
           <article
             v-for="thread in studentThreads"
             :key="thread.root.id"
@@ -284,7 +327,7 @@
               </div>
             </div>
           </article>
-        </div>
+        </TransitionGroup>
       </div>
     </section>
   </div>
@@ -333,10 +376,25 @@ const detail = ref<ExhibitionDetail | null>(null)
 const comments = ref<CommunityComments | null>(null)
 const commentContent = ref('')
 const replyTarget = ref<Comment | null>(null)
+const reviewReplyTarget = ref<SubmissionReview | null>(null)
 const liked = ref(false)
 const favorited = ref(false)
+const likeBumping = ref(false)
+const favoriteBumping = ref(false)
 const activeCommentTab = ref<'student' | 'teacher'>('student')
 const expandedKeys = ref<Record<string, boolean>>({})
+const commentFormRef = ref<HTMLElement | null>(null)
+
+function triggerBump(target: 'like' | 'favorite') {
+  const flag = target === 'like' ? likeBumping : favoriteBumping
+  flag.value = false
+  window.requestAnimationFrame(() => {
+    flag.value = true
+    window.setTimeout(() => {
+      flag.value = false
+    }, 420)
+  })
+}
 
 const canFeature = computed(() => ['teacher', 'admin'].includes(authStore.user?.role || ''))
 
@@ -401,14 +459,37 @@ async function handleCreateComment() {
   creatingComment.value = true
   errorMessage.value = ''
 
+  const mentionUserIds: number[] = []
+  let parentCommentId: number | null = null
+  const wasTeacherReply = Boolean(reviewReplyTarget.value)
+
+  if (replyTarget.value) {
+    parentCommentId = replyTarget.value.id
+    mentionUserIds.push(replyTarget.value.userId)
+  } else if (reviewReplyTarget.value) {
+    mentionUserIds.push(reviewReplyTarget.value.reviewer.id)
+  }
+
   try {
-    await createCommunityComment(exhibitionId, {
+    const newComment = await createCommunityComment(exhibitionId, {
       content,
-      parentCommentId: replyTarget.value?.id || null,
-      mentionUserIds: replyTarget.value ? [replyTarget.value.userId] : [],
+      parentCommentId,
+      mentionUserIds,
     })
 
-    await refreshComments()
+    // 后端返回的 mentionUsers 目前为空数组，这里按当前回复目标兜底补齐，
+    // 让乐观更新在「同学回复」区也能立即显示。
+    const enrichedComment: Comment = {
+      ...newComment,
+      mentionUsers: buildMentionUsersFallback(newComment),
+    }
+
+    if (comments.value) {
+      comments.value = {
+        ...comments.value,
+        studentComments: [...comments.value.studentComments, enrichedComment],
+      }
+    }
 
     if (detail.value) {
       detail.value = {
@@ -422,7 +503,8 @@ async function handleCreateComment() {
 
     commentContent.value = ''
     replyTarget.value = null
-    activeCommentTab.value = 'student'
+    reviewReplyTarget.value = null
+    activeCommentTab.value = wasTeacherReply ? 'teacher' : 'student'
     appStore.showToast('评论已发布', 'success')
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '评论发布失败')
@@ -433,10 +515,44 @@ async function handleCreateComment() {
 
 function setReplyTarget(comment: Comment) {
   replyTarget.value = comment
+  reviewReplyTarget.value = null
+}
+
+function setReplyToTeacher(review: SubmissionReview) {
+  reviewReplyTarget.value = review
+  replyTarget.value = null
+  scrollToCommentForm()
+}
+
+function scrollToCommentForm() {
+  if (commentFormRef.value) {
+    commentFormRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 function clearReplyTarget() {
   replyTarget.value = null
+  reviewReplyTarget.value = null
+}
+
+function buildMentionUsersFallback(newComment: Comment) {
+  if (newComment.mentionUsers && newComment.mentionUsers.length > 0) {
+    return newComment.mentionUsers
+  }
+  if (replyTarget.value) {
+    return [replyTarget.value.user]
+  }
+  if (reviewReplyTarget.value) {
+    return [reviewReplyTarget.value.reviewer]
+  }
+  return []
+}
+
+function teacherReplies(teacherId: number) {
+  const list = comments.value?.studentComments || []
+  return list
+    .filter((comment) => !comment.parentCommentId && (comment.mentionUsers?.some((u) => u.id === teacherId) ?? false))
+    .sort((l, r) => new Date(l.createdAt).getTime() - new Date(r.createdAt).getTime())
 }
 
 async function handleLike() {
@@ -448,6 +564,9 @@ async function handleLike() {
   const nextLiked = !liked.value
   liked.value = nextLiked
   writeInteractionState('like', nextLiked)
+  if (nextLiked) {
+    triggerBump('like')
+  }
   detail.value = {
     ...detail.value,
     stats: {
@@ -491,6 +610,9 @@ async function handleFavorite() {
   const nextFavorited = !favorited.value
   favorited.value = nextFavorited
   writeInteractionState('favorite', nextFavorited)
+  if (nextFavorited) {
+    triggerBump('favorite')
+  }
   detail.value = {
     ...detail.value,
     stats: {
@@ -616,3 +738,79 @@ function buildInteractionStorageKey(type: 'like' | 'favorite') {
 
 onMounted(fetchCommunityDetail)
 </script>
+
+<style scoped>
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  padding: 0.375rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.action-btn-default {
+  border-color: rgb(254 215 170);
+  color: rgb(194 65 12);
+}
+
+.action-btn-default:hover {
+  background-color: rgb(255 247 237);
+}
+
+.action-btn-liked {
+  border-color: rgb(253 164 175);
+  background-color: rgb(255 241 242);
+  color: rgb(225 29 72);
+  box-shadow: 0 6px 14px rgba(244, 63, 94, 0.18);
+}
+
+.action-btn-favorited {
+  border-color: rgb(253 230 138);
+  background-color: rgb(255 251 235);
+  color: rgb(180 83 9);
+  box-shadow: 0 6px 14px rgba(245, 158, 11, 0.18);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.action-btn-bump svg {
+  animation: heart-bump 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes heart-bump {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  60% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+.comment-list-enter-active,
+.comment-list-leave-active {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
+}
+
+.comment-list-enter-from {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
+}
+
+.comment-list-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.comment-list-move {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+</style>

@@ -51,12 +51,13 @@ public class AssetServiceImpl implements AssetService {
                 assetType,
                 resolveSourceType(folder, bizType),
                 storedFileName,
+                originalFileName,
                 fileUrl,
                 fileExt,
                 mimeType,
                 file.getSize()
         );
-        return new AssetResponses.AssetUploadDataResponse(assetId, storedFileName, fileUrl, mimeType, file.getSize());
+        return new AssetResponses.AssetUploadDataResponse(assetId, storedFileName, originalFileName, fileUrl, mimeType, file.getSize());
     }
 
     @Override

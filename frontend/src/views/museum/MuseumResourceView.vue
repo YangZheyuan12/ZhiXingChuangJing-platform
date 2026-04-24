@@ -126,18 +126,18 @@
           </div>
         </div>
 
-        <div v-if="loading" class="rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm text-stone-500">
+        <div v-if="loading && resources.length === 0" class="rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm text-stone-500">
           正在加载文博资源，请稍候。
         </div>
 
         <div
-          v-else-if="resources.length === 0"
+          v-else-if="!loading && resources.length === 0"
           class="rounded-[22px] border border-dashed border-stone-300 bg-stone-50 px-5 py-8 text-sm text-stone-500"
         >
           当前没有可展示的资源数据。你可以先执行一次资源同步，或调整筛选条件后重新查询。
         </div>
 
-        <div v-else class="flex flex-col gap-4">
+        <div v-else class="flex flex-col gap-4" :class="{ 'opacity-70 transition-opacity': loading }">
           <RouterLink
             v-for="resource in resources"
             :key="resource.id"

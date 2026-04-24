@@ -23,12 +23,6 @@ export function setupRouterGuards(router: Router) {
       return { path: authStore.user?.role === 'admin' ? '/admin' : '/' }
     }
 
-    if (!isPublic && authStore.user?.role === 'admin') {
-      if (to.path === '/') {
-        return { path: '/admin' }
-      }
-    }
-
     if (isAdminRoute && authStore.user?.role !== 'admin') {
       return { path: '/' }
     }

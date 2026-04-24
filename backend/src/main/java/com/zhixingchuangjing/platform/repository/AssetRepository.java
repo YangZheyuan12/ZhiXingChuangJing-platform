@@ -25,15 +25,16 @@ public class AssetRepository {
                             String assetType,
                             String sourceType,
                             String fileName,
+                            String originalFileName,
                             String fileUrl,
                             String fileExt,
                             String mimeType,
                             Long fileSize) {
         String sql = """
                 INSERT INTO media_assets (
-                  owner_id, asset_type, source_type, file_name, file_url, file_ext,
+                  owner_id, asset_type, source_type, file_name, original_file_name, file_url, file_ext,
                   mime_type, file_size, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 """;
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -42,10 +43,11 @@ public class AssetRepository {
             ps.setString(2, assetType);
             ps.setString(3, sourceType);
             ps.setString(4, fileName);
-            ps.setString(5, fileUrl);
-            ps.setString(6, fileExt);
-            ps.setString(7, mimeType);
-            ps.setObject(8, fileSize);
+            ps.setString(5, originalFileName);
+            ps.setString(6, fileUrl);
+            ps.setString(7, fileExt);
+            ps.setString(8, mimeType);
+            ps.setObject(9, fileSize);
             return ps;
         }, keyHolder);
         return keyHolder.getKey().longValue();
@@ -64,6 +66,7 @@ public class AssetRepository {
                 new AssetResponses.AssetResponse(
                         rs.getLong("id"),
                         rs.getString("file_name"),
+                        rs.getString("original_file_name"),
                         rs.getString("file_url"),
                         rs.getString("mime_type"),
                         rs.getObject("file_size", Long.class),
@@ -82,7 +85,7 @@ public class AssetRepository {
     private QuerySpec buildAssetQuery(Long ownerId, String assetType, String sourceType, boolean countOnly) {
         StringBuilder sql = new StringBuilder(countOnly ? "SELECT COUNT(1) " : """
                 SELECT
-                  id, file_name, file_url, mime_type, file_size, asset_type, source_type, created_at
+                  id, file_name, original_file_name, file_url, mime_type, file_size, asset_type, source_type, created_at
                 """);
         sql.append("FROM media_assets WHERE owner_id = ? ");
         List<Object> args = new ArrayList<>();

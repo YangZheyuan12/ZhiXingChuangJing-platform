@@ -507,6 +507,7 @@ export interface ReadNotificationsRequest {
 export interface AssetUploadData {
   assetId: number
   fileName: string
+  originalFileName?: string | null
   fileUrl: string
   mimeType?: string | null
   fileSize?: number | null

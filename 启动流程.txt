@@ -1,206 +1,636 @@
 ================================================================
-知行创境教育创作平台 - 本地启动流程
+知行创境教育创作平台 · 零基础启动教程
 ================================================================
-适用环境: Windows 11 + PowerShell
-项目根目录: D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
-编写日期: 2026-04-24
+适用系统:   Windows 10 / Windows 11（64 位）
+项目位置:   D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
+目标读者:   从没写过代码、从没部署过项目的同学也能照做
+编写日期:   2026-04-24
 ================================================================
 
 
-【一、前置依赖检查】
-----------------------------------------------------------------
-打开 PowerShell，依次执行下列命令确认环境:
+═════════════════════════════════════════════════════════════════
+写在前面：这份文档会带你做什么
+═════════════════════════════════════════════════════════════════
 
-    java -version          # 需要 JDK 17 或更高 (已验证 17/22 均可)
-    mvn -v                 # Maven 3.9+
-    node -v                # Node 18+ (已验证 v24.11)
-    npm -v                 # npm 9+
+全程分成 4 个阶段：
 
-检查三个服务是否运行:
+  阶段 1 · 安装 5 个软件（JDK / Maven / Node.js / MySQL / Redis）
+  阶段 2 · 项目初始化（建库、打包后端、装前端依赖）——只做一次
+  阶段 3 · 启动项目（开两个 PowerShell 分别跑后端和前端）
+  阶段 4 · 浏览器登录使用
 
-    Get-Service MySQL                                  # 状态应为 Running
-    Get-Process redis-server -ErrorAction SilentlyContinue   # 有返回即 Redis 在跑
-    Get-NetTCPConnection -LocalPort 3306,6379 -ErrorAction SilentlyContinue
+所有命令都在 **PowerShell** 里执行。每一步都会告诉你：
 
-若 MySQL 没跑:
-    Start-Service MySQL
+  ✅ 【做什么】目标
+  📋 【怎么做】命令（可直接复制粘贴）
+  🔍 【怎么验证】执行完应该看到什么
 
-若 Redis 没跑:
-    # 自己找到 redis-server.exe 的位置手动启动，或装成 Windows 服务
+遇到报错先去最后一节【常见错误速查】对照解决。
 
 
-【二、首次启动（只做一次）】
-----------------------------------------------------------------
+═════════════════════════════════════════════════════════════════
+预备：如何打开 PowerShell
+═════════════════════════════════════════════════════════════════
 
-## 2.1 初始化 MySQL 数据库 ##
+📋 操作：
+  1. 按键盘左下角的 Win 键（windows 图标）
+  2. 输入四个字：PowerShell
+  3. 搜索结果里右键点"Windows PowerShell"，选【以管理员身份运行】
+  4. 弹出"是否允许此应用..." 点【是】
 
-在项目根目录执行:
+🔍 验证：
+  看到蓝底或黑底窗口，标题栏写"管理员: Windows PowerShell"，
+  光标闪烁在 PS C:\Windows\system32> 之后
+
+💡 后面只要文档说"在 PowerShell 执行"，指的就是这个窗口。
+   可以同时开多个 PowerShell 窗口，后面会用到 2~3 个。
+
+
+═════════════════════════════════════════════════════════════════
+阶段 1 · 安装 5 个依赖软件
+═════════════════════════════════════════════════════════════════
+合计约 1.5 GB。已经装过的可以跳过对应小节。
+
+
+【1-1】JDK 17（Java 运行环境）
+─────────────────────────────────────────────────────────────────
+✅ 后端是 Java 写的，必须先装 Java。
+
+📋 步骤：
+  (1) 浏览器打开下载页：
+      https://adoptium.net/zh-CN/temurin/releases/?version=17
+
+  (2) 选择：
+      Operating System: Windows
+      Architecture:     x64
+      Package Type:     JDK
+      Version:          17 - LTS
+
+  (3) 点 .msi 下载（约 170 MB）
+
+  (4) 双击 .msi 安装，一路【Next】
+
+  (5) ⚠️ 走到【Custom Setup】这页时，把下面两项都改成
+     "Will be installed on local hard drive"：
+
+     ☑ Set JAVA_HOME variable
+     ☑ Add to PATH
+
+     （默认是红叉，必须改，否则后面会报"java 不是内部命令"）
+
+  (6) 继续【Next】→【Install】→【Finish】
+
+  (7) ⚠️ 关掉所有 PowerShell 窗口，重新以管理员身份打开
+
+🔍 验证：
+      java -version
+
+  期望输出：
+      openjdk version "17.0.X" ...
+      OpenJDK Runtime Environment Temurin-17.0.X ...
+
+
+【1-2】Maven 3.9（后端打包工具）
+─────────────────────────────────────────────────────────────────
+✅ 把 Java 源代码编译打包成可运行的 jar 文件。
+
+📋 步骤：
+  (1) 浏览器打开：
+      https://maven.apache.org/download.cgi
+
+  (2) 找【Binary zip archive】那一行，下载
+      apache-maven-3.9.X-bin.zip（约 9 MB）
+
+  (3) 右键解压，把里面的 apache-maven-3.9.X 整个文件夹
+      复制到：
+
+          C:\apache-maven-3.9.X
+
+      ⚠️ 不要放中文路径，不要放带空格的目录
+
+  (4) 配置 PATH 环境变量：
+      a) 按 Win 键，输入"环境变量"，点【编辑系统环境变量】
+      b) 点右下角【环境变量(N)...】
+      c) 下方"系统变量"里找到 Path，双击
+      d) 点【新建】，粘贴：
+
+          C:\apache-maven-3.9.X\bin
+
+          （末尾必须是 \bin，版本号对应你刚才解压的）
+      e) 点【确定】→【确定】→【确定】
+
+  (5) ⚠️ 关掉所有 PowerShell，重新以管理员身份打开
+
+🔍 验证：
+      mvn -v
+
+  期望输出：
+      Apache Maven 3.9.X
+      Maven home: C:\apache-maven-3.9.X
+      Java version: 17.0.X, vendor: Eclipse Adoptium
+
+
+【1-3】Node.js 20+（前端运行环境）
+─────────────────────────────────────────────────────────────────
+✅ 前端是 Vue 3 写的，需要 Node.js 才能跑。
+
+📋 步骤：
+  (1) 浏览器打开：
+      https://nodejs.org/zh-cn/download
+
+  (2) 选【LTS 长期支持版】，下载 Windows Installer .msi 64-bit（约 30 MB）
+
+  (3) 双击 .msi 安装，一路【Next】
+     - 默认已勾 "Add to PATH"，保持
+     - 【Tools for Native Modules】这页**取消勾选**
+       "Automatically install the necessary tools..."
+       （不用装这些）
+
+  (4) 关闭所有 PowerShell，重新以管理员身份打开
+
+🔍 验证：
+      node -v        # 期望: v20.X.X 或 v22.X.X
+      npm -v         # 期望: 10.X.X 或更高
+
+
+【1-4】MySQL 8（数据库）
+─────────────────────────────────────────────────────────────────
+✅ 存储用户、作品、评论等所有数据。
+
+📋 步骤：
+  (1) 浏览器打开：
+      https://dev.mysql.com/downloads/installer/
+
+  (2) 下载 mysql-installer-community-8.0.XX.X.msi
+     （选第二个大的那个，约 400 MB）
+     下载前页面要注册，点底部【No thanks, just start my download.】跳过
+
+  (3) 双击 .msi 开始安装
+
+  (4) 【Choosing a Setup Type】选【Server only】→【Next】
+
+  (5) 【Check Requirements】有黄感叹号就点【Execute】补装依赖 →【Next】
+
+  (6) 【Installation】点【Execute】，进度条走完 →【Next】
+
+  (7) 【Product Configuration】→【Next】
+
+  (8) 【Type and Networking】保持 Port: 3306 →【Next】
+
+  (9) 【Authentication Method】保持默认 →【Next】
+
+  (10) ⚠️【Accounts and Roles】——这步非常重要：
+
+       MySQL Root Password:  123456
+       Repeat Password:      123456
+
+       必须填 123456（项目配置默认用这个密码）
+       如果你一定要用别的密码，记下来，后面要改项目配置
+
+       →【Next】
+
+  (11) 【Windows Service】保持默认 →【Next】
+
+  (12) 【Apply Configuration】点【Execute】，等全部变绿勾 →【Finish】
+
+  (13) 一路【Next】→【Finish】结束
+
+🔍 验证：
+      Get-Service MySQL80
+
+  期望 Status: Running
+
+      mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "SHOW DATABASES;"
+
+  期望看到一个表格，列出 information_schema / mysql / performance_schema / sys
+
+  ⚠️ PowerShell 下 -h 和 -P 参数必须加单引号 '，否则会报错
+
+
+【1-5】Redis（缓存服务）
+─────────────────────────────────────────────────────────────────
+✅ 存验证码、登录会话等短期数据。
+
+📋 步骤（Windows 没官方版，用民间编译的版本）：
+  (1) 浏览器打开：
+      https://github.com/tporadowski/redis/releases
+
+  (2) 下载最新版 Redis-x64-5.0.XX.msi（约 5 MB）
+
+  (3) 双击 .msi 安装：
+      - Port Number 保持 6379
+      - 勾选【Add an exception to the Windows Firewall】
+      - 勾选【Install as a Windows Service】（开机自启）
+      - 一路【Next】→【Finish】
+
+🔍 验证：
+      Get-Service Redis
+
+  期望 Status: Running
+
+      redis-cli ping
+
+  返回 PONG 就成功
+
+
+═════════════════════════════════════════════════════════════════
+阶段 2 · 项目初始化（只做一次）
+═════════════════════════════════════════════════════════════════
+
+
+【2-1】进入项目目录
+─────────────────────────────────────────────────────────────────
+📋 在 PowerShell 执行：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
+
+🔍 验证：提示符变成
+    PS D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform>
+
+
+【2-2】初始化数据库
+─────────────────────────────────────────────────────────────────
+✅ 在 MySQL 里创建 zhixingchuangjing 库 + 24 张表 + 4 个测试账号。
+
+📋 执行：
+
     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' --default-character-set=utf8mb4 -e "source deploy/mysql/init.sql"
 
-注意:
-  - PowerShell 下 -h 和 -P 参数必须加单引号，否则会被解析错
-  - 若 root 密码不是 123456，请先改 application-dev.yml 里的密码或改 MySQL 密码
-  - 初始化脚本位置: deploy/mysql/init.sql
-  - 执行完后会创建 zhixingchuangjing 库 + 24 张表 + 种子账号
+  若你 MySQL 密码不是 123456，把 -p123456 改成 -p你的密码
 
-验证:
+🔍 验证：
+  命令执行几秒后返回提示符，没报错就是成功。验证表已建好：
+
     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "USE zhixingchuangjing; SHOW TABLES;"
 
+  期望看到 24 行表名（users / exhibitions / tasks / 等）
 
-## 2.2 后端首次打包（下载 Maven 依赖 + 打 fat jar）##
+  验证默认账号：
+
+    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "USE zhixingchuangjing; SELECT username, role FROM users;"
+
+  期望看到 4 行：admin / teacher001 / student001 / student002
+
+
+【2-3】首次打包后端
+─────────────────────────────────────────────────────────────────
+✅ 把后端 Java 代码编译成一个可直接运行的 jar 文件。
+
+📋 执行：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
     mvn -DskipTests package
 
-首次运行会下载大量依赖，慢的时候要 5-10 分钟，耐心等
-成功后会生成:
-    backend\target\platform-backend-0.0.1-SNAPSHOT.jar
+  ⏰ 首次执行会下载约 200 MB 依赖，5~10 分钟
+     屏幕一直滚动 [INFO] Downloading ... 是正常的
+
+🔍 验证：
+  最后几行看到：
+
+      [INFO] BUILD SUCCESS
+      [INFO] Total time:  X min
+
+  生成文件：backend\target\platform-backend-0.0.1-SNAPSHOT.jar
 
 
-## 2.3 前端安装依赖 ##
+【2-4】安装前端依赖
+─────────────────────────────────────────────────────────────────
+✅ 下载前端代码需要的各种 npm 包。
+
+📋 执行：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\frontend
     npm install
 
+  ⏰ 首次约 3~8 分钟
 
-## 2.4 （可选）启动 MinIO 对象存储 ##
+🔍 验证：
+  最后几行类似：
 
-不启动的话，上传素材/头像/视频会失败，但登录、浏览、评论等功能正常。
+      added XXX packages in XXs
 
-方式 A - Docker (推荐):
-    docker run -d --name zxcyj-minio -p 9000:9000 -p 9001:9001 `
-      -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin `
-      minio/minio:latest server /data --console-address ":9001"
-
-方式 B - 下载 minio.exe:
-    去 https://min.io/download 下载 Windows 版 minio.exe
-    执行: .\minio.exe server D:\minio-data --console-address ":9001"
+  frontend 目录下多了 node_modules 文件夹
 
 
-【三、日常启动（每次开发）】
-----------------------------------------------------------------
-开两个 PowerShell 窗口:
+═════════════════════════════════════════════════════════════════
+阶段 3 · 启动项目（每次开发都要做）
+═════════════════════════════════════════════════════════════════
 
-## 窗口 1 - 启动后端 ##
+⚠️ 需要 **两个 PowerShell 窗口同时开着**：一个跑后端，一个跑前端。
+
+
+【3-1】窗口 1 —— 启动后端
+─────────────────────────────────────────────────────────────────
+📋 执行：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
     java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
 
-看到 "Started ZhiXingChuangJingApplication in X seconds" 即启动完成
-后端地址: http://127.0.0.1:8080
+  ⏰ 启动 5~15 秒
+
+🔍 验证：
+  日志最后出现：
+      Started ZhiXingChuangJingApplication in X seconds ...
+
+  窗口会一直停在运行状态（不返回提示符）
+
+  ⚠️ 此窗口**一直保留**，关掉后端就停了。
+     需要敲其他命令就另开窗口。
 
 
-## 窗口 2 - 启动前端 ##
+【3-2】窗口 2 —— 启动前端
+─────────────────────────────────────────────────────────────────
+📋 新开一个 PowerShell 窗口，执行：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\frontend
     npm run dev
 
-看到 "VITE v5.x.x  ready in Xms" 和 Local: http://localhost:5173/ 即启动完成
-前端地址: http://localhost:5173
+  ⏰ 启动 2~5 秒
+
+🔍 验证：
+  日志出现：
+      VITE v5.X.X  ready in XXX ms
+      ➜  Local:   http://localhost:5173/
+
+  ⚠️ 此窗口也一直保留
 
 
-## 浏览器打开 ##
+【3-3】浏览器访问
+─────────────────────────────────────────────────────────────────
+📋 推荐 Chrome / Edge（不要用 IE！），地址栏输入：
 
-    http://localhost:5173
+      http://localhost:5173
 
-
-【四、默认账号】
-----------------------------------------------------------------
-所有账号密码均为 123456
-
-    admin        - 管理员
-    teacher001   - 老师
-    student001   - 学生
-    student002   - 学生
+🔍 验证：看到"知行创境"登录页就成功了！
 
 
-【五、修改后端代码后如何重启】
-----------------------------------------------------------------
-后端改了代码，必须重新打包才能生效:
+═════════════════════════════════════════════════════════════════
+阶段 4 · 登录使用
+═════════════════════════════════════════════════════════════════
 
-    # 先在运行后端的窗口按 Ctrl+C 停止
+
+【默认测试账号（密码全部是 123456）】
+─────────────────────────────────────────────────────────────────
+
+  ┌──────────────┬────────┬────────────────────────┐
+  │ 用户名       │ 角色   │ 登录后会进入           │
+  ├──────────────┼────────┼────────────────────────┤
+  │ admin        │ 管理员 │ 深色的管理后台         │
+  │ teacher001   │ 教师   │ 创作端工作台           │
+  │ student001   │ 学生   │ 创作端工作台           │
+  │ student002   │ 学生   │ 创作端工作台           │
+  └──────────────┴────────┴────────────────────────┘
+
+
+═════════════════════════════════════════════════════════════════
+日常：改了代码怎么办
+═════════════════════════════════════════════════════════════════
+
+
+【前端改动】
+─────────────────────────────────────────────────────────────────
+不用管。Vite 会自动热更新（HMR），浏览器里立刻看到改动。
+
+
+【后端改动（Java 文件或 .yml 配置）】
+─────────────────────────────────────────────────────────────────
+必须重新打包 + 重启：
+
+    # 先在后端窗口按 Ctrl+C 停掉
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
     mvn -DskipTests package
     java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
 
-前端改了代码无需手动重启，Vite 会自动热更新（HMR）。
+⏰ 二次打包只需 5~30 秒
 
 
-【六、常见坑 & 解决方案】
-----------------------------------------------------------------
+【数据库结构变更】
+─────────────────────────────────────────────────────────────────
+开发者通知你"数据库表改了"时执行：
 
-## 坑 1: ClassNotFoundException ZhiXingChuangJingApplication ##
-原因: 路径里有中文（"计算机设计大赛"），mvn spring-boot:run 在 fork 子进程时
-      Windows 命令行对中文参数解析异常
-解决: 不要用 mvn spring-boot:run，改用 java -jar 的方式启动
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
+    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' --default-character-set=utf8mb4 -e "source deploy/mysql/init.sql"
 
-
-## 坑 2: Java -D 参数报 "找不到主类 .encoding=UTF-8" ##
-原因: PowerShell 对 -D 开头的参数解析有问题
-解决: 给每个 -D 参数加单引号，例如:
-      java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar xxx.jar
+脚本是**幂等的**（可重复跑），不会破坏已有数据。
 
 
-## 坑 3: Unable to determine Dialect without JDBC metadata ##
-原因: MySQL 连接失败 (库不存在 / 密码错 / MySQL 没起)
-解决:
-  1. 确认 MySQL 在 3306 监听:
-     Get-NetTCPConnection -LocalPort 3306
-  2. 确认能用 123456 登录:
+═════════════════════════════════════════════════════════════════
+关闭服务
+═════════════════════════════════════════════════════════════════
+
+正常关闭：
+  分别在后端窗口和前端窗口按 Ctrl+C
+
+强制清理残留进程：
+    Get-Process java,node -ErrorAction SilentlyContinue | Stop-Process -Force
+
+停掉 MySQL / Redis（一般不必，让它们开机自启）：
+    Stop-Service MySQL80
+    Stop-Service Redis
+
+
+═════════════════════════════════════════════════════════════════
+常见错误速查
+═════════════════════════════════════════════════════════════════
+
+
+【A】"java 不是内部或外部命令"
+─────────────────────────────────────────────────────────────────
+原因：JDK 没装或环境变量没生效
+解决：
+  1. 回到【1-1】重装，确认勾了 "Add to PATH" 和 "Set JAVA_HOME"
+  2. 关掉所有 PowerShell 重开
+  3. 还不行就重启电脑
+
+
+【B】"mvn 不是内部或外部命令"
+─────────────────────────────────────────────────────────────────
+原因：Maven 路径没加到 PATH 或加错
+解决：
+  1. 确认 C:\apache-maven-3.9.X 存在
+  2. 确认 Path 里加的是 C:\apache-maven-3.9.X\bin（末尾 \bin）
+  3. 重启 PowerShell
+
+
+【C】"npm / node 不是内部或外部命令"
+─────────────────────────────────────────────────────────────────
+原因：Node.js 没装
+解决：回到【1-3】重装
+
+
+【D】MySQL 报 "Unknown MySQL server host '127'"
+─────────────────────────────────────────────────────────────────
+原因：PowerShell 吃掉了 -h 参数
+解决：-h 和 -P 参数必须加单引号：
+    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "..."
+
+
+【E】后端启动报 "Communications link failure"
+─────────────────────────────────────────────────────────────────
+原因：MySQL 没跑 / 密码不对 / 库不存在
+解决：
+  1. Get-Service MySQL80   确认 Running
+     如果 Stopped：Start-Service MySQL80
+  2. 测密码：
+     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "SELECT 1"
+  3. 测库是否存在：
      mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "SHOW DATABASES;"
-  3. 确认 zhixingchuangjing 库存在，不存在则执行 2.1 初始化
+     没看到 zhixingchuangjing 就回去跑【2-2】初始化
+  4. 若密码不是 123456，改 backend/src/main/resources/application-dev.yml
+     里的 password 字段，然后重新【2-3】打包
 
 
-## 坑 4: 前端 'vite' 不是内部或外部命令 ##
-原因: node_modules 不完整
-解决:
-    cd frontend
-    rm -r node_modules    # 或手动删除
+【F】后端启动报 "Cannot connect to Redis"
+─────────────────────────────────────────────────────────────────
+原因：Redis 没跑
+解决：
+  1. Get-Service Redis
+  2. 如果 Stopped：Start-Service Redis
+  3. 如果装 Redis 时忘了勾"Install as Service"：
+     手动启动：redis-server
+
+
+【G】后端启动报 ClassNotFoundException ZhiXingChuangJingApplication
+─────────────────────────────────────────────────────────────────
+原因：用了 mvn spring-boot:run 且路径有中文
+解决：别用 mvn spring-boot:run，必须用文档里的
+      java -jar target/platform-backend-0.0.1-SNAPSHOT.jar 方式
+
+
+【H】java 报 "找不到主类 .encoding=UTF-8"
+─────────────────────────────────────────────────────────────────
+原因：PowerShell 对 -D 开头参数解析异常
+解决：每个 -D 参数加单引号：
+    java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar xxx.jar
+
+
+【I】前端启动报 "vite 不是内部或外部命令"
+─────────────────────────────────────────────────────────────────
+原因：node_modules 装坏了
+解决：
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\frontend
+    Remove-Item node_modules -Recurse -Force
     npm install
 
 
-## 坑 5: MySQL 连接参数被 PowerShell 吃掉 ##
-例如 mysql -h127.0.0.1 -P3306 会报 "Unknown MySQL server host '127'"
-解决: 每个 - 开头的参数都加单引号:
-      mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "..."
+【J】前端请求后端报 CORS 错误
+─────────────────────────────────────────────────────────────────
+原因：前端地址不在后端白名单里
+解决：改 backend/src/main/resources/application.yml 的
+    app.cors.allowed-origins，加进新地址后重新打包后端
 
 
-## 坑 6: 前端请求后端 CORS 失败 ##
-后端允许的 origin 在 backend/src/main/resources/application.yml 里:
-    app.cors.allowed-origins: http://localhost:5173,http://127.0.0.1:5173
-如果用了别的端口访问前端，需要把新地址加进这个列表，然后重打包后端。
+【K】浏览器打开 http://localhost:5173 显示"无法访问此网站"
+─────────────────────────────────────────────────────────────────
+原因：前端没启动 / 端口被占用
+解决：
+  1. 确认前端窗口显示 "VITE ready"
+  2. 如果 5173 被占，Vite 会自动换 5174/5175，看前端窗口实际输出的地址
+  3. 确认是 http:// 不是 https://
 
 
-【七、关闭服务】
-----------------------------------------------------------------
-在对应 PowerShell 窗口按 Ctrl+C 即可
+【L】后端启动报 "Port 8080 was already in use"
+─────────────────────────────────────────────────────────────────
+原因：有旧的 Java 进程没退干净
+解决：
+    Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force
+    然后重新启动
 
-批量清理残留 Java / Node 进程:
-    Get-Process java,node -ErrorAction SilentlyContinue | Stop-Process -Force
+
+【M】上传文件 / 头像 / 视频失败
+─────────────────────────────────────────────────────────────────
+原因：MinIO 没装（可选服务）
+解决：项目其他功能都能跑，只有上传用不了。
+    需要上传功能的话，参考下面【MinIO（可选）】小节
 
 
-【八、快捷启动脚本（可选）】
-----------------------------------------------------------------
-把下面两段分别存成两个 .ps1 文件，双击或右键 "用 PowerShell 运行":
+═════════════════════════════════════════════════════════════════
+MinIO 对象存储（可选，只影响文件上传）
+═════════════════════════════════════════════════════════════════
+
+不装 MinIO 影响：上传素材、头像、视频会失败
+不装 MinIO 不影响：登录、浏览、评论、点赞、任务、文博资源
+
+方式 A - 用 Docker（推荐，前提是电脑装了 Docker Desktop）：
+
+    docker run -d --name zxcyj-minio -p 9000:9000 -p 9001:9001 `
+      -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin `
+      minio/minio:latest server /data --console-address ":9001"
+
+方式 B - 下载 minio.exe：
+  1. https://min.io/download 下载 Windows 版 minio.exe
+  2. 放到 D:\minio-bin\，创建数据目录 D:\minio-data\
+  3. 新开一个 PowerShell：
+     cd D:\minio-bin
+     .\minio.exe server D:\minio-data --console-address ":9001"
+  4. 这个窗口也要一直开着
+
+管理面板：http://localhost:9001
+账号/密码：minioadmin / minioadmin
+
+
+═════════════════════════════════════════════════════════════════
+进阶：一键启动脚本（可选）
+═════════════════════════════════════════════════════════════════
+
+每天都要启动的话，可以做成双击启动的脚本。
+把下面两段分别存成两个 .ps1 文件放到项目根目录：
 
 ### start-backend.ps1 ###
-Set-Location $PSScriptRoot\backend
-java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
+    Set-Location 'D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend'
+    java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
 
 ### start-frontend.ps1 ###
-Set-Location $PSScriptRoot\frontend
-npm run dev
+    Set-Location 'D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\frontend'
+    npm run dev
+
+使用方法：
+    右键 .ps1 文件 → 【用 PowerShell 运行】
+
+首次运行如果提示"脚本未经授权"，在管理员 PowerShell 执行一次：
+    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+    （回答 Y 确认）
 
 
-【九、端口分配总表】
-----------------------------------------------------------------
-    3306   MySQL
-    6379   Redis
-    9000   MinIO API          (可选)
-    9001   MinIO Console      (可选)
-    8080   Spring Boot 后端
-    5173   Vite 前端
+═════════════════════════════════════════════════════════════════
+端口对照表
+═════════════════════════════════════════════════════════════════
 
-================================================================
+  ┌──────┬────────────────────────┬──────────┐
+  │ 端口 │ 用途                   │ 必需？   │
+  ├──────┼────────────────────────┼──────────┤
+  │ 3306 │ MySQL 数据库           │ 是       │
+  │ 6379 │ Redis 缓存             │ 是       │
+  │ 8080 │ Spring Boot 后端       │ 是       │
+  │ 5173 │ Vite 前端开发服务器    │ 是       │
+  │ 9000 │ MinIO 对象存储 (API)   │ 可选     │
+  │ 9001 │ MinIO 管理面板         │ 可选     │
+  └──────┴────────────────────────┴──────────┘
+
+
+═════════════════════════════════════════════════════════════════
+项目目录速查
+═════════════════════════════════════════════════════════════════
+
+  ZhiXingChuangJing-Platform/
+  ├── backend/                 后端 Spring Boot 项目
+  │   ├── src/main/java/       Java 源代码
+  │   ├── src/main/resources/  配置文件 + SQL 脚本
+  │   ├── pom.xml              Maven 依赖清单
+  │   └── target/              打包输出（运行 mvn package 后生成）
+  │
+  ├── frontend/                前端 Vue 3 项目
+  │   ├── src/                 TypeScript + Vue 源代码
+  │   ├── package.json         npm 依赖清单
+  │   └── node_modules/        依赖（npm install 后生成）
+  │
+  ├── deploy/mysql/init.sql    数据库初始化脚本
+  ├── docs/                    项目文档
+  └── 启动流程.txt             你正在看的这份文档
+
+
+════════════════════════════════════════════════════════════════
+至此全部结束。
+遇到新问题先查【常见错误速查】。
+查不到的，把 PowerShell 里的完整错误信息截图发给开发者。
+════════════════════════════════════════════════════════════════

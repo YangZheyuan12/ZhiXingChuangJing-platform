@@ -90,7 +90,7 @@
             <img
               v-if="asset.assetType === 'image'"
               :src="asset.fileUrl"
-              :alt="asset.fileName"
+              :alt="displayName(asset)"
               class="aspect-[4/3] w-full object-cover"
             />
             <video
@@ -113,7 +113,12 @@
 
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <h3 class="truncate text-sm font-medium text-slate-900">{{ asset.fileName }}</h3>
+              <h3
+                class="truncate text-sm font-medium text-slate-900"
+                :title="displayName(asset)"
+              >
+                {{ displayName(asset) }}
+              </h3>
               <p class="mt-1 text-xs text-slate-500">{{ asset.mimeType || '未知 MIME 类型' }}</p>
             </div>
             <div class="flex shrink-0 gap-1.5">
@@ -135,7 +140,7 @@
             </a>
             <a
               :href="asset.fileUrl"
-              :download="asset.fileName"
+              :download="displayName(asset)"
               class="flex-1 rounded-md bg-brand-600 px-3 py-2 text-center text-sm font-medium text-white transition hover:bg-brand-700"
             >
               下载素材
@@ -207,7 +212,7 @@ async function handleUpload() {
 
   try {
     const result = await uploadAsset(selectedFile.value, uploadForm)
-    appStore.showToast(`素材上传成功：${result.fileName}`, 'success')
+    appStore.showToast(`素材上传成功：${result.originalFileName || result.fileName}`, 'success')
     selectedFile.value = null
     await fetchAssets()
   } catch (error) {
@@ -220,6 +225,10 @@ async function handleUpload() {
 function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   selectedFile.value = target.files?.[0] || null
+}
+
+function displayName(asset: Asset) {
+  return asset.originalFileName || asset.fileName
 }
 
 function formatFileSize(value?: number | null) {

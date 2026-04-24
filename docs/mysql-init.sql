@@ -146,7 +146,8 @@ CREATE TABLE IF NOT EXISTS media_assets (
   owner_id BIGINT UNSIGNED NOT NULL COMMENT '上传人ID',
   asset_type VARCHAR(20) NOT NULL COMMENT '类型：image/video/audio/document/model',
   source_type VARCHAR(20) NOT NULL DEFAULT 'upload' COMMENT '来源：upload/platform/museum',
-  file_name VARCHAR(255) NOT NULL COMMENT '文件名',
+  file_name VARCHAR(255) NOT NULL COMMENT '存储文件名（UUID）',
+  original_file_name VARCHAR(255) DEFAULT NULL COMMENT '用户上传时的原始文件名',
   file_url VARCHAR(255) NOT NULL COMMENT '文件地址',
   file_ext VARCHAR(20) DEFAULT NULL COMMENT '扩展名',
   mime_type VARCHAR(100) DEFAULT NULL COMMENT 'MIME类型',
@@ -511,3 +512,23 @@ VALUES
   (4, '红色记忆', 'theme')
 ON DUPLICATE KEY UPDATE
   tag_type = VALUES(tag_type);
+
+-- 兼容迁移：为旧库的 media_assets 增加 original_file_name 列
+SET @schema_name = DATABASE();
+SET @table_name = 'media_assets';
+SET @column_name = 'original_file_name';
+SET @has_column = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @schema_name
+    AND TABLE_NAME = @table_name
+    AND COLUMN_NAME = @column_name
+);
+SET @migration_sql = IF(
+  @has_column = 0,
+  CONCAT('ALTER TABLE ', @table_name, ' ADD COLUMN ', @column_name,
+         ' VARCHAR(255) DEFAULT NULL COMMENT ''用户上传时的原始文件名'' AFTER file_name'),
+  'SELECT 1'
+);
+PREPARE migration_stmt FROM @migration_sql;
+EXECUTE migration_stmt;
+DEALLOCATE PREPARE migration_stmt;

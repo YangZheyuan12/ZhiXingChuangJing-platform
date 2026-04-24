@@ -10,6 +10,7 @@ public final class AssetResponses {
     public record AssetUploadDataResponse(
             Long assetId,
             String fileName,
+            String originalFileName,
             String fileUrl,
             String mimeType,
             Long fileSize
@@ -19,6 +20,7 @@ public final class AssetResponses {
     public record AssetResponse(
             Long assetId,
             String fileName,
+            String originalFileName,
             String fileUrl,
             String mimeType,
             Long fileSize,

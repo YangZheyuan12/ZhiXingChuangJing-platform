@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import Layout from '@/layouts/Layout.vue'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 
 export const routes: RouteRecordRaw[] = [
   {
@@ -22,13 +23,50 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    component: Layout,
+    component: AdminLayout,
+    meta: { adminOnly: true },
     children: [
       {
         path: '',
         name: 'admin-dashboard',
         component: () => import('@/views/dashboard/DashboardView.vue'),
         meta: { title: '管理总览', adminOnly: true },
+      },
+      {
+        path: 'classes',
+        name: 'admin-classes',
+        component: () => import('@/views/admin/AdminPlaceholderView.vue'),
+        meta: { title: '班级审核', adminOnly: true },
+      },
+      {
+        path: 'tasks',
+        name: 'admin-tasks',
+        component: () => import('@/views/admin/AdminPlaceholderView.vue'),
+        meta: { title: '任务审核', adminOnly: true },
+      },
+      {
+        path: 'community',
+        name: 'admin-community',
+        component: () => import('@/views/admin/AdminPlaceholderView.vue'),
+        meta: { title: '社区审核', adminOnly: true },
+      },
+      {
+        path: 'assets',
+        name: 'admin-assets',
+        component: () => import('@/views/admin/AdminPlaceholderView.vue'),
+        meta: { title: '素材审核', adminOnly: true },
+      },
+      {
+        path: 'museum',
+        name: 'admin-museum',
+        component: () => import('@/views/admin/AdminPlaceholderView.vue'),
+        meta: { title: '文博资源管理', adminOnly: true },
+      },
+      {
+        path: 'notifications',
+        name: 'admin-notifications',
+        component: () => import('@/views/admin/AdminPlaceholderView.vue'),
+        meta: { title: '系统通知', adminOnly: true },
       },
     ],
   },

@@ -21,12 +21,20 @@
       {{ errorMessage }}
     </p>
 
-    <section v-if="loading" class="panel-card p-6 text-sm text-slate-500">
+    <section v-if="loading && !detail" class="panel-card p-6 text-sm text-slate-500">
       资源详情加载中...
     </section>
 
     <template v-else-if="detail">
-      <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <Transition name="fade">
+        <div
+          v-if="loading"
+          class="pointer-events-none fixed right-6 top-20 z-30 rounded-full bg-white/95 px-4 py-1.5 text-xs font-medium text-red-700 shadow-md ring-1 ring-red-100"
+        >
+          切换中…
+        </div>
+      </Transition>
+      <div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]" :class="{ 'opacity-80 transition-opacity': loading }">
         <section class="panel-card p-6">
           <div class="border-b border-slate-100 pb-4">
             <p class="text-xs font-semibold uppercase tracking-[0.28em] text-red-700/70">Overview</p>
@@ -251,6 +259,16 @@ onMounted(fetchDetail)
 </script>
 
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .museum-detail-row {
   display: flex;
   flex-direction: column;
