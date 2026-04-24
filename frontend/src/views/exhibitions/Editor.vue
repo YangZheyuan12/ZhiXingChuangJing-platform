@@ -78,6 +78,11 @@
               @move-down="handleLayerMoveDown"
             />
           </template>
+
+          <!-- 模板 -->
+          <template v-else-if="activeLeftTab === 'templates'">
+            <TemplatePicker @apply="handleApplyTemplate" />
+          </template>
         </div>
       </aside>
 
@@ -160,6 +165,8 @@ import AssetPicker from '@/components/exhibitions/editor/AssetPicker.vue'
 import LayerPanel from '@/components/exhibitions/editor/LayerPanel.vue'
 import TextStylePanel from '@/components/exhibitions/editor/TextStylePanel.vue'
 import type { LayerItem } from '@/components/exhibitions/editor/LayerPanel.vue'
+import TemplatePicker from '@/components/exhibitions/editor/TemplatePicker.vue'
+import { useAlignmentGuides } from '@/composables/useAlignmentGuides'
 
 // ─── 常量 ───
 const LOGICAL_WIDTH = 1920
@@ -184,8 +191,9 @@ const leftTabs = [
   { label: '组件库', value: 'components' as const },
   { label: '素材库', value: 'assets' as const },
   { label: '图层', value: 'layers' as const },
+  { label: '模板', value: 'templates' as const },
 ]
-const activeLeftTab = ref<'components' | 'assets' | 'layers'>('components')
+const activeLeftTab = ref<'components' | 'assets' | 'layers' | 'templates'>('components')
 
 // ─── 画布 ───
 const canvasEl = ref<HTMLCanvasElement | null>(null)
@@ -228,6 +236,8 @@ const shortcuts = useCanvasShortcuts(fabricCanvas, {
   save: () => handleSave(),
 })
 
+const alignGuides = useAlignmentGuides(fabricCanvas, LOGICAL_WIDTH, LOGICAL_HEIGHT)
+
 // ═══════════════════════════════════════════════════════════
 //  画布初始化 & 坐标系
 // ═══════════════════════════════════════════════════════════
@@ -257,6 +267,7 @@ function initCanvas() {
   history.reset()
   autosave.bindCanvasEvents()
   shortcuts.bind()
+  alignGuides.bind()
 
   canvasWrapper.value?.addEventListener('wheel', handleWheel, { passive: false })
 }
@@ -435,6 +446,61 @@ function handleWheel(e: WheelEvent) {
   e.preventDefault()
   const delta = e.deltaY > 0 ? -0.05 : 0.05
   zoomBy(delta)
+}
+
+// ═══════════════════════════════════════════════════════════
+//  组件模板
+// ═══════════════════════════════════════════════════════════
+
+function handleApplyTemplate(templateId: string) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const W = LOGICAL_WIDTH
+  const H = LOGICAL_HEIGHT
+
+  const templates: Record<string, () => void> = {
+    'title-page': () => {
+      canvas.add(new Rect({ left: 0, top: 0, width: W, height: H, fill: '#1e293b', selectable: false }))
+      canvas.add(new Textbox('展厅标题', { left: W / 2 - 300, top: H * 0.32, width: 600, fontSize: 72, fontFamily: 'serif', fill: '#ffffff', textAlign: 'center' }))
+      canvas.add(new Textbox('副标题或简介文字', { left: W / 2 - 250, top: H * 0.52, width: 500, fontSize: 28, fontFamily: 'sans-serif', fill: '#94a3b8', textAlign: 'center' }))
+    },
+    'image-text': () => {
+      canvas.add(new Rect({ left: 60, top: 120, width: 800, height: 600, rx: 20, ry: 20, fill: '#e2d6cc', stroke: '#c5b9ad', strokeWidth: 1 }))
+      canvas.add(new Textbox('在此添加标题', { left: 940, top: 180, width: 860, fontSize: 36, fontFamily: 'serif', fill: '#1e293b' }))
+      canvas.add(new Textbox('在此添加段落内容，描述图片或文物的背景故事。', { left: 940, top: 260, width: 860, fontSize: 20, fontFamily: 'sans-serif', fill: '#64748b', lineHeight: 1.6 }))
+    },
+    'dual-panel': () => {
+      canvas.add(new Rect({ left: 60, top: 120, width: 880, height: 700, rx: 20, ry: 20, fill: '#f1ebe5', stroke: '#d6cec6', strokeWidth: 1 }))
+      canvas.add(new Rect({ left: 980, top: 120, width: 880, height: 700, rx: 20, ry: 20, fill: '#f1ebe5', stroke: '#d6cec6', strokeWidth: 1 }))
+      canvas.add(new Textbox('左侧面板标题', { left: 120, top: 200, width: 760, fontSize: 28, fontFamily: 'serif', fill: '#1e293b', textAlign: 'center' }))
+      canvas.add(new Textbox('右侧面板标题', { left: 1040, top: 200, width: 760, fontSize: 28, fontFamily: 'serif', fill: '#1e293b', textAlign: 'center' }))
+    },
+    'quote-block': () => {
+      canvas.add(new Rect({ left: 200, top: 200, width: W - 400, height: 500, rx: 24, ry: 24, fill: '#fef3c7', stroke: '#fcd34d', strokeWidth: 2 }))
+      canvas.add(new Textbox('"', { left: 240, top: 220, width: 100, fontSize: 120, fontFamily: 'serif', fill: '#d97706' }))
+      canvas.add(new Textbox('在此输入引用的名言或重要文段', { left: 300, top: 340, width: W - 600, fontSize: 32, fontFamily: 'serif', fill: '#92400e', lineHeight: 1.5 }))
+      canvas.add(new Textbox('— 出处', { left: 300, top: 540, width: W - 600, fontSize: 20, fontFamily: 'sans-serif', fill: '#b45309', textAlign: 'right' }))
+    },
+    'gallery-grid': () => {
+      const gw = 560; const gh = 380; const gap = 40
+      const startX = (W - gw * 2 - gap) / 2; const startY = (H - gh * 2 - gap) / 2
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 2; col++) {
+          canvas.add(new Rect({
+            left: startX + col * (gw + gap),
+            top: startY + row * (gh + gap),
+            width: gw, height: gh, rx: 16, ry: 16, fill: '#e2d6cc', stroke: '#c5b9ad', strokeWidth: 1,
+          }))
+        }
+      }
+    },
+  }
+
+  const apply = templates[templateId]
+  if (apply) {
+    apply()
+    canvas.requestRenderAll()
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -723,6 +789,7 @@ function refreshLayers() {
 
 onBeforeUnmount(() => {
   canvasWrapper.value?.removeEventListener('wheel', handleWheel)
+  alignGuides.unbind()
   shortcuts.unbind()
   history.unbindCanvasEvents()
   autosave.destroy()
