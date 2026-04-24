@@ -61,10 +61,21 @@
           </template>
 
           <!-- 素材库 -->
-          <template v-else>
+          <template v-else-if="activeLeftTab === 'assets'">
             <AssetPicker
               @insert-asset="handleInsertAsset"
               @insert-museum="handleInsertMuseum"
+            />
+          </template>
+
+          <!-- 图层 -->
+          <template v-else-if="activeLeftTab === 'layers'">
+            <LayerPanel
+              :layers="layerList"
+              @select="handleLayerSelect"
+              @toggle-visible="handleLayerToggleVisible"
+              @move-up="handleLayerMoveUp"
+              @move-down="handleLayerMoveDown"
             />
           </template>
         </div>
@@ -74,7 +85,12 @@
       <main class="relative flex min-w-0 flex-1 flex-col bg-neutral-100">
         <div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-1.5">
           <span class="text-xs text-gray-400">{{ LOGICAL_WIDTH }} × {{ LOGICAL_HEIGHT }}</span>
-          <span class="text-xs text-gray-400">{{ Math.round(currentZoom * 100) }}%</span>
+          <div class="flex items-center gap-1">
+            <button type="button" class="toolbar-btn text-xs" title="缩小" @click="zoomBy(-0.1)">−</button>
+            <span class="w-12 text-center text-xs text-gray-400">{{ Math.round(currentZoom * 100) }}%</span>
+            <button type="button" class="toolbar-btn text-xs" title="放大" @click="zoomBy(0.1)">+</button>
+            <button type="button" class="toolbar-btn text-xs" title="适应窗口" @click="fitCanvasToContainer()">⊡</button>
+          </div>
         </div>
         <div ref="canvasWrapper" class="flex flex-1 items-center justify-center overflow-hidden p-4">
           <canvas ref="canvasEl" />
@@ -85,16 +101,31 @@
       <aside class="w-64 shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-4">
         <h3 class="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">属性</h3>
         <template v-if="selectedObject">
-          <div class="space-y-3">
-            <label v-for="prop in propertyFields" :key="prop.key" class="block">
-              <span class="text-xs text-gray-500">{{ prop.label }}</span>
-              <input
-                type="number"
-                class="mt-1 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm focus:border-brand-400 focus:outline-none"
-                :value="Math.round(selectedProps[prop.key])"
-                @input="onPropInput(prop.key, $event)"
+          <div class="space-y-4">
+            <div class="space-y-3">
+              <label v-for="prop in propertyFields" :key="prop.key" class="block">
+                <span class="text-xs text-gray-500">{{ prop.label }}</span>
+                <input
+                  type="number"
+                  class="mt-1 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm focus:border-brand-400 focus:outline-none"
+                  :value="Math.round(selectedProps[prop.key])"
+                  @input="onPropInput(prop.key, $event)"
+                />
+              </label>
+            </div>
+
+            <div v-if="isTextboxSelected" class="border-t border-gray-100 pt-4">
+              <TextStylePanel
+                :font-family="textStyle.fontFamily"
+                :font-size="textStyle.fontSize"
+                :fill="textStyle.fill"
+                :font-weight="textStyle.fontWeight"
+                :font-style="textStyle.fontStyle"
+                :underline="textStyle.underline"
+                :text-align="textStyle.textAlign"
+                @update="handleTextStyleUpdate"
               />
-            </label>
+            </div>
           </div>
         </template>
         <p v-else class="text-xs text-gray-400">选中画布元素后可编辑属性。</p>
@@ -126,6 +157,9 @@ import { useCanvasHistory } from '@/composables/useCanvasHistory'
 import { useCanvasAutosave } from '@/composables/useCanvasAutosave'
 import { useCanvasShortcuts } from '@/composables/useCanvasShortcuts'
 import AssetPicker from '@/components/exhibitions/editor/AssetPicker.vue'
+import LayerPanel from '@/components/exhibitions/editor/LayerPanel.vue'
+import TextStylePanel from '@/components/exhibitions/editor/TextStylePanel.vue'
+import type { LayerItem } from '@/components/exhibitions/editor/LayerPanel.vue'
 
 // ─── 常量 ───
 const LOGICAL_WIDTH = 1920
@@ -149,8 +183,9 @@ const currentZoom = ref(1)
 const leftTabs = [
   { label: '组件库', value: 'components' as const },
   { label: '素材库', value: 'assets' as const },
+  { label: '图层', value: 'layers' as const },
 ]
-const activeLeftTab = ref<'components' | 'assets'>('components')
+const activeLeftTab = ref<'components' | 'assets' | 'layers'>('components')
 
 // ─── 画布 ───
 const canvasEl = ref<HTMLCanvasElement | null>(null)
@@ -211,6 +246,8 @@ function initCanvas() {
   canvas.on('selection:updated', syncSelectedProps)
   canvas.on('selection:cleared', () => { selectedObject.value = null })
   canvas.on('object:modified', syncSelectedProps)
+  canvas.on('object:added', refreshLayers)
+  canvas.on('object:removed', refreshLayers)
 
   resizeObserver = new ResizeObserver(() => fitCanvasToContainer())
   if (canvasWrapper.value) resizeObserver.observe(canvasWrapper.value)
@@ -220,6 +257,8 @@ function initCanvas() {
   history.reset()
   autosave.bindCanvasEvents()
   shortcuts.bind()
+
+  canvasWrapper.value?.addEventListener('wheel', handleWheel, { passive: false })
 }
 
 function fitCanvasToContainer() {
@@ -273,6 +312,129 @@ function handlePropChange(key: string, rawValue: string) {
   else if (key === 'h') obj.set('scaleY', value / (obj.height ?? 1))
   obj.setCoords()
   canvas.requestRenderAll()
+}
+
+// ═══════════════════════════════════════════════════════════
+//  图层管理
+// ═══════════════════════════════════════════════════════════
+
+const layerList = computed<LayerItem[]>(() => {
+  const canvas = fabricCanvas.value
+  if (!canvas) return []
+  const objects = canvas.getObjects()
+  const activeObj = canvas.getActiveObject()
+  return objects.map((obj) => {
+    const name = (obj as any).assetName || (obj as any).text?.slice(0, 20) || obj.type || 'object'
+    const icon = obj.type === 'textbox' ? 'T' : obj.type === 'rect' ? '▬' : obj.type === 'group' ? '▦' : obj.type === 'image' ? '🖼' : '●'
+    return {
+      icon,
+      label: name,
+      active: obj === activeObj,
+      visible: obj.visible !== false,
+    }
+  })
+})
+
+function handleLayerSelect(idx: number) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const obj = canvas.getObjects()[idx]
+  if (obj) {
+    canvas.setActiveObject(obj)
+    canvas.requestRenderAll()
+  }
+}
+
+function handleLayerToggleVisible(idx: number) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const obj = canvas.getObjects()[idx]
+  if (obj) {
+    obj.set('visible', !obj.visible)
+    canvas.requestRenderAll()
+  }
+}
+
+function handleLayerMoveUp(idx: number) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const objects = canvas.getObjects()
+  if (idx <= 0) return
+  const obj = objects[idx]
+  canvas.moveObjectTo(obj, idx - 1)
+  canvas.requestRenderAll()
+}
+
+function handleLayerMoveDown(idx: number) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const objects = canvas.getObjects()
+  if (idx >= objects.length - 1) return
+  const obj = objects[idx]
+  canvas.moveObjectTo(obj, idx + 1)
+  canvas.requestRenderAll()
+}
+
+// ═══════════════════════════════════════════════════════════
+//  文本样式
+// ═══════════════════════════════════════════════════════════
+
+const isTextboxSelected = computed(() => selectedObject.value?.type === 'textbox')
+
+const textStyle = computed(() => {
+  const obj = selectedObject.value as any
+  if (!obj || obj.type !== 'textbox') return { fontFamily: 'sans-serif', fontSize: 28, fill: '#1e293b', fontWeight: 'normal', fontStyle: 'normal', underline: false, textAlign: 'left' }
+  return {
+    fontFamily: obj.fontFamily ?? 'sans-serif',
+    fontSize: obj.fontSize ?? 28,
+    fill: typeof obj.fill === 'string' ? obj.fill : '#1e293b',
+    fontWeight: obj.fontWeight ?? 'normal',
+    fontStyle: obj.fontStyle ?? 'normal',
+    underline: obj.underline ?? false,
+    textAlign: obj.textAlign ?? 'left',
+  }
+})
+
+function handleTextStyleUpdate(prop: string, value: unknown) {
+  const obj = selectedObject.value
+  const canvas = fabricCanvas.value
+  if (!obj || !canvas || obj.type !== 'textbox') return
+  obj.set(prop as keyof typeof obj, value)
+  canvas.requestRenderAll()
+  syncSelectedProps()
+}
+
+// ═══════════════════════════════════════════════════════════
+//  画布缩放
+// ═══════════════════════════════════════════════════════════
+
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 3
+
+function zoomBy(delta: number) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom.value + delta))
+  applyZoom(newZoom)
+}
+
+function applyZoom(zoom: number) {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  currentZoom.value = zoom
+  canvas.setZoom(zoom)
+  canvas.setDimensions({
+    width: LOGICAL_WIDTH * zoom,
+    height: LOGICAL_HEIGHT * zoom,
+  })
+  canvas.requestRenderAll()
+}
+
+function handleWheel(e: WheelEvent) {
+  if (!e.ctrlKey && !e.metaKey) return
+  e.preventDefault()
+  const delta = e.deltaY > 0 ? -0.05 : 0.05
+  zoomBy(delta)
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -553,7 +715,14 @@ onMounted(async () => {
   await restoreLatestVersion()
 })
 
+function refreshLayers() {
+  // trigger layerList recomputation by touching the canvas ref
+  const c = fabricCanvas.value
+  if (c) fabricCanvas.value = c
+}
+
 onBeforeUnmount(() => {
+  canvasWrapper.value?.removeEventListener('wheel', handleWheel)
   shortcuts.unbind()
   history.unbindCanvasEvents()
   autosave.destroy()
