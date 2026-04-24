@@ -52,6 +52,11 @@ export function useCanvasAutosave(
     }
   }
 
+  function clearDirty() {
+    dirty = false
+    if (timer) { clearTimeout(timer); timer = null }
+  }
+
   function pauseAutosave() {
     paused.value = true
     if (timer) { clearTimeout(timer); timer = null }
@@ -88,6 +93,7 @@ export function useCanvasAutosave(
     autosaving,
     markDirty,
     flush,
+    clearDirty,
     pauseAutosave,
     resumeAutosave,
     bindCanvasEvents,

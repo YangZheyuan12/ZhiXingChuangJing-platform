@@ -204,6 +204,7 @@ let resizeObserver: ResizeObserver | null = null
 // ─── 选中元素属性 ───
 const selectedObject = shallowRef<FabricObject | null>(null)
 const selectedProps = reactive({ x: 0, y: 0, w: 0, h: 0 })
+const layerVersion = ref(0)
 const propertyFields = [
   { key: 'x' as const, label: 'X 坐标' },
   { key: 'y' as const, label: 'Y 坐标' },
@@ -330,11 +331,13 @@ function handlePropChange(key: string, rawValue: string) {
 // ═══════════════════════════════════════════════════════════
 
 const layerList = computed<LayerItem[]>(() => {
+  layerVersion.value
   const canvas = fabricCanvas.value
   if (!canvas) return []
-  const objects = canvas.getObjects()
+  const objects = canvas.getObjects().filter((o) => !(o as any).__isGuide)
   const activeObj = canvas.getActiveObject()
-  return objects.map((obj) => {
+  // 反序：最上层的对象显示在列表顶部（Photoshop 习惯）
+  return [...objects].reverse().map((obj) => {
     const name = (obj as any).assetName || (obj as any).text?.slice(0, 20) || obj.type || 'object'
     const icon = obj.type === 'textbox' ? 'T' : obj.type === 'rect' ? '▬' : obj.type === 'group' ? '▦' : obj.type === 'image' ? '🖼' : '●'
     return {
@@ -346,10 +349,20 @@ const layerList = computed<LayerItem[]>(() => {
   })
 })
 
+function getFilteredObjects(): FabricObject[] {
+  const canvas = fabricCanvas.value
+  if (!canvas) return []
+  return canvas.getObjects().filter((o) => !(o as any).__isGuide)
+}
+
+function getReversedObjects(): FabricObject[] {
+  return [...getFilteredObjects()].reverse()
+}
+
 function handleLayerSelect(idx: number) {
   const canvas = fabricCanvas.value
   if (!canvas) return
-  const obj = canvas.getObjects()[idx]
+  const obj = getReversedObjects()[idx]
   if (obj) {
     canvas.setActiveObject(obj)
     canvas.requestRenderAll()
@@ -359,7 +372,7 @@ function handleLayerSelect(idx: number) {
 function handleLayerToggleVisible(idx: number) {
   const canvas = fabricCanvas.value
   if (!canvas) return
-  const obj = canvas.getObjects()[idx]
+  const obj = getReversedObjects()[idx]
   if (obj) {
     obj.set('visible', !obj.visible)
     canvas.requestRenderAll()
@@ -369,21 +382,28 @@ function handleLayerToggleVisible(idx: number) {
 function handleLayerMoveUp(idx: number) {
   const canvas = fabricCanvas.value
   if (!canvas) return
-  const objects = canvas.getObjects()
+  const reversed = getReversedObjects()
   if (idx <= 0) return
-  const obj = objects[idx]
-  canvas.moveObjectTo(obj, idx - 1)
+  const obj = reversed[idx]
+  const allObjects = canvas.getObjects()
+  const realIdx = allObjects.indexOf(obj)
+  canvas.moveObjectTo(obj, realIdx + 1)
   canvas.requestRenderAll()
+  refreshLayers()
 }
 
 function handleLayerMoveDown(idx: number) {
   const canvas = fabricCanvas.value
   if (!canvas) return
-  const objects = canvas.getObjects()
-  if (idx >= objects.length - 1) return
-  const obj = objects[idx]
-  canvas.moveObjectTo(obj, idx + 1)
+  const reversed = getReversedObjects()
+  if (idx >= reversed.length - 1) return
+  const obj = reversed[idx]
+  const allObjects = canvas.getObjects()
+  const realIdx = allObjects.indexOf(obj)
+  if (realIdx <= 0) return
+  canvas.moveObjectTo(obj, realIdx - 1)
   canvas.requestRenderAll()
+  refreshLayers()
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -684,6 +704,7 @@ async function handleSave() {
     const payload = buildSavePayload()
     payload.versionNote = '手动保存'
     const version = await saveExhibitionVersion(exhibitionId, payload)
+    autosave.clearDirty()
     appStore.showToast(`版本 V${version.versionNo} 已保存`, 'success')
     await loadVersions()
   } catch (error) {
@@ -782,9 +803,7 @@ onMounted(async () => {
 })
 
 function refreshLayers() {
-  // trigger layerList recomputation by touching the canvas ref
-  const c = fabricCanvas.value
-  if (c) fabricCanvas.value = c
+  layerVersion.value++
 }
 
 onBeforeUnmount(() => {

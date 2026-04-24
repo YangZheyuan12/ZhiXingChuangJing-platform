@@ -93,9 +93,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Canvas } from 'fabric'
-import { getExhibitionViewer } from '@/api/modules/exhibitions'
+import { getExhibitionViewer, getExhibitionVersions } from '@/api/modules/exhibitions'
 import { getErrorMessage } from '@/utils/request'
-import type { ExhibitionViewerData } from '@/api/types'
+import type { ExhibitionViewerData, ExhibitionVersion } from '@/api/types'
 
 const LOGICAL_WIDTH = 1920
 const LOGICAL_HEIGHT = 1080
@@ -107,6 +107,7 @@ const exhibitionId = Number(route.params.exhibitionId)
 const loading = ref(true)
 const errorMessage = ref('')
 const viewer = ref<ExhibitionViewerData | null>(null)
+const versions = ref<ExhibitionVersion[]>([])
 
 const viewerCanvasEl = ref<HTMLCanvasElement | null>(null)
 const viewerWrapper = ref<HTMLElement | null>(null)
@@ -127,7 +128,12 @@ async function loadViewer() {
   loading.value = true
   errorMessage.value = ''
   try {
-    viewer.value = await getExhibitionViewer(exhibitionId)
+    const [viewerData, versionList] = await Promise.all([
+      getExhibitionViewer(exhibitionId),
+      getExhibitionVersions(exhibitionId).catch(() => [] as ExhibitionVersion[]),
+    ])
+    viewer.value = viewerData
+    versions.value = versionList
   } catch (e) {
     errorMessage.value = getErrorMessage(e, '展厅加载失败')
   } finally {
@@ -212,10 +218,24 @@ async function renderVersionData() {
 }
 
 function findVersionJson(): Record<string, unknown> | null {
+  // 优先从已发布的版本中获取原始 Fabric JSON
+  const publishedNo = viewer.value?.exhibition?.publishedVersionNo
+  if (publishedNo && versions.value.length > 0) {
+    const published = versions.value.find((v) => v.versionNo === publishedNo)
+    if (published?.versionData && typeof published.versionData === 'object' && 'objects' in published.versionData) {
+      return published.versionData
+    }
+  }
+  // 回退：取最新版本
+  if (versions.value.length > 0) {
+    const latest = versions.value[0]
+    if (latest?.versionData && typeof latest.versionData === 'object' && 'objects' in latest.versionData) {
+      return latest.versionData
+    }
+  }
+  // 最后回退：尝试 renderData 本身
   const rd = viewer.value?.renderData as any
-  // versionData 直接挂在 renderData 上或 renderData 本身就是 fabric toJSON 输出
   if (rd?.objects) return rd
-  if (rd?.versionData?.objects) return rd.versionData
   return null
 }
 
