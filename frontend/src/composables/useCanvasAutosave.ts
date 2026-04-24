@@ -2,6 +2,7 @@ import { ref, type ShallowRef } from 'vue'
 import type { Canvas } from 'fabric'
 import { saveExhibitionVersion } from '@/api/modules/exhibitions'
 import type { SaveExhibitionVersionRequest } from '@/api/types'
+import { isDrawingGuides } from './useAlignmentGuides'
 
 const AUTOSAVE_DELAY_MS = 10_000
 
@@ -20,7 +21,7 @@ export function useCanvasAutosave(
   let saving = false
 
   function markDirty() {
-    if (paused.value) return
+    if (paused.value || isDrawingGuides()) return
     dirty = true
     scheduleAutosave()
   }

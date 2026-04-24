@@ -1,5 +1,6 @@
 import { ref, type ShallowRef } from 'vue'
 import type { Canvas } from 'fabric'
+import { isDrawingGuides } from './useAlignmentGuides'
 
 const MAX_STACK_SIZE = 50
 
@@ -18,7 +19,7 @@ export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
   }
 
   function takeSnapshot() {
-    if (isReplaying || !fabricCanvas.value) return
+    if (isReplaying || isDrawingGuides() || !fabricCanvas.value) return
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       if (!fabricCanvas.value) return
@@ -45,6 +46,7 @@ export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
 
   async function undo() {
     if (!canUndo.value || !fabricCanvas.value) return
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
     isReplaying = true
     try {
       const current = undoStack.value.pop()!
@@ -60,6 +62,7 @@ export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
 
   async function redo() {
     if (!canRedo.value || !fabricCanvas.value) return
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
     isReplaying = true
     try {
       const next = redoStack.value.pop()!

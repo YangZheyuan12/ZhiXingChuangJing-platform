@@ -4,6 +4,9 @@ import { Line, type Canvas, type FabricObject } from 'fabric'
 const SNAP_THRESHOLD = 8
 const GUIDE_COLOR = '#3b82f6'
 
+let _isDrawingGuides = false
+export function isDrawingGuides() { return _isDrawingGuides }
+
 export function useAlignmentGuides(
   fabricCanvas: ShallowRef<Canvas | null>,
   logicalWidth: number,
@@ -12,15 +15,18 @@ export function useAlignmentGuides(
   const guideLines: Line[] = []
 
   function clearGuides() {
+    _isDrawingGuides = true
     const canvas = fabricCanvas.value
     if (!canvas) return
     guideLines.forEach((line) => canvas.remove(line))
     guideLines.length = 0
+    _isDrawingGuides = false
   }
 
   function addGuideLine(x1: number, y1: number, x2: number, y2: number) {
     const canvas = fabricCanvas.value
     if (!canvas) return
+    _isDrawingGuides = true
     const line = new Line([x1, y1, x2, y2], {
       stroke: GUIDE_COLOR,
       strokeWidth: 1,
@@ -32,6 +38,7 @@ export function useAlignmentGuides(
     ;(line as any).__isGuide = true
     guideLines.push(line)
     canvas.add(line)
+    _isDrawingGuides = false
   }
 
   function getSnapPoints(movingObj: FabricObject): { hSnaps: number[]; vSnaps: number[] } {

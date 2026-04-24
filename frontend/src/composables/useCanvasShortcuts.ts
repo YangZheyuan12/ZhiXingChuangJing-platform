@@ -7,6 +7,8 @@ export interface CanvasShortcutHandlers {
   save: () => void
 }
 
+const CUSTOM_PROPS = ['assetType', 'assetId', 'mediaUrl', 'assetName']
+
 export function useCanvasShortcuts(
   fabricCanvas: ShallowRef<Canvas | null>,
   handlers: CanvasShortcutHandlers,
@@ -79,12 +81,12 @@ export function useCanvasShortcuts(
   async function copySelected(canvas: Canvas) {
     const active = canvas.getActiveObject()
     if (!active) return
-    clipboard = await active.clone()
+    clipboard = await active.clone(CUSTOM_PROPS)
   }
 
   async function pasteClipboard(canvas: Canvas) {
     if (!clipboard) return
-    const cloned = await clipboard.clone()
+    const cloned = await clipboard.clone(CUSTOM_PROPS)
     cloned.set({ left: (cloned.left ?? 0) + 20, top: (cloned.top ?? 0) + 20 })
     canvas.add(cloned)
     canvas.setActiveObject(cloned)
@@ -94,7 +96,7 @@ export function useCanvasShortcuts(
   async function duplicateSelected(canvas: Canvas) {
     const active = canvas.getActiveObject()
     if (!active) return
-    const cloned = await active.clone()
+    const cloned = await active.clone(CUSTOM_PROPS)
     cloned.set({ left: (cloned.left ?? 0) + 20, top: (cloned.top ?? 0) + 20 })
     canvas.add(cloned)
     canvas.setActiveObject(cloned)
