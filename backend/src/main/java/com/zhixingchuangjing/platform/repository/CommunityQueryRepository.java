@@ -55,7 +55,8 @@ public class CommunityQueryRepository {
                                 rs.getInt("favorite_count"),
                                 rs.getInt("comment_count")
                         ),
-                        exhibitionQueryRepository.findExhibitionTags(rs.getLong("id"))
+                        exhibitionQueryRepository.findExhibitionTags(rs.getLong("id")),
+                        null, null, null
                 ), args.toArray());
     }
 

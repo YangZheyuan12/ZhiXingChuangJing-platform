@@ -24,14 +24,21 @@ public class ExhibitionCommandRepository {
                                  String coverUrl,
                                  String summary,
                                  String groupName,
-                                 String visibility) {
+                                 String visibility,
+                                 Long templateId,
+                                 String templateSnapshotJson) {
         String sql = """
                 INSERT INTO exhibitions (
                   task_id, owner_id, title, cover_url, summary, group_name, status, visibility,
+                  workflow_status, visibility_scope, bundle_revision,
+                  template_id, template_snapshot_json,
                   latest_version_no, published_version_no, featured_flag,
                   view_count, like_count, favorite_count, comment_count,
                   created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, 0, 0, 0, 0, 0, 0, 0, NOW(), NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?,
+                  'draft', 'private', 0,
+                  ?, ?,
+                  0, 0, 0, 0, 0, 0, 0, NOW(), NOW())
                 """;
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -43,6 +50,8 @@ public class ExhibitionCommandRepository {
             ps.setString(5, summary);
             ps.setString(6, groupName);
             ps.setString(7, visibility);
+            ps.setObject(8, templateId);
+            ps.setString(9, templateSnapshotJson);
             return ps;
         }, keyHolder);
         return keyHolder.getKey().longValue();
@@ -159,6 +168,20 @@ public class ExhibitionCommandRepository {
 
     public void updateOwner(Long exhibitionId, Long ownerId) {
         jdbcTemplate.update("UPDATE exhibitions SET owner_id = ?, updated_at = NOW() WHERE id = ?", ownerId, exhibitionId);
+    }
+
+    public int incrementBundleRevisionIfMatch(Long exhibitionId, Integer expectedRevision) {
+        String sql = """
+            UPDATE exhibitions
+            SET bundle_revision = bundle_revision + 1, updated_at = NOW()
+            WHERE id = ? AND bundle_revision = ?
+            """;
+        return jdbcTemplate.update(sql, exhibitionId, expectedRevision);
+    }
+
+    public Integer getCurrentBundleRevision(Long exhibitionId) {
+        String sql = "SELECT bundle_revision FROM exhibitions WHERE id = ?";
+        return jdbcTemplate.queryForObject(sql, Integer.class, exhibitionId);
     }
 
     public Long upsertDigitalHuman(Long exhibitionId,

@@ -31,7 +31,10 @@ public final class ExhibitionResponses {
             Integer latestVersionNo,
             Integer publishedVersionNo,
             ExhibitionStatsResponse stats,
-            List<String> tags
+            List<String> tags,
+            String workflowStatus,
+            String visibilityScope,
+            Boolean isFeatured
     ) {
     }
 
@@ -61,7 +64,11 @@ public final class ExhibitionResponses {
             List<String> tags,
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
-            List<ExhibitionMemberResponse> collaborators
+            List<ExhibitionMemberResponse> collaborators,
+            String workflowStatus,
+            String visibilityScope,
+            Boolean isFeatured,
+            Integer bundleRevision
     ) {
     }
 

@@ -202,7 +202,8 @@ public class TaskQueryRepository {
                         rs.getInt("favorite_count"),
                         rs.getInt("comment_count")
                 ),
-                List.of()
+                List.of(),
+                null, null, null
         ), taskId, limit);
     }
 

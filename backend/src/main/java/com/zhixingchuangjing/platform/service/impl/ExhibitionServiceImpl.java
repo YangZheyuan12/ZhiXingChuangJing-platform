@@ -12,8 +12,10 @@ import com.zhixingchuangjing.platform.model.response.CommonResponses;
 import com.zhixingchuangjing.platform.model.response.ExhibitionResponses;
 import com.zhixingchuangjing.platform.repository.ExhibitionCommandRepository;
 import com.zhixingchuangjing.platform.repository.ExhibitionQueryRepository;
+import com.zhixingchuangjing.platform.repository.HotspotCommandRepository;
 import com.zhixingchuangjing.platform.repository.TaskQueryRepository;
 import com.zhixingchuangjing.platform.repository.UserRepository;
+import com.zhixingchuangjing.platform.repository.ZoneCommandRepository;
 import com.zhixingchuangjing.platform.service.ExhibitionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,17 +39,23 @@ public class ExhibitionServiceImpl implements ExhibitionService {
     private final TaskQueryRepository taskQueryRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+    private final ZoneCommandRepository zoneCommandRepository;
+    private final HotspotCommandRepository hotspotCommandRepository;
 
     public ExhibitionServiceImpl(ExhibitionQueryRepository exhibitionQueryRepository,
                                  ExhibitionCommandRepository exhibitionCommandRepository,
                                  TaskQueryRepository taskQueryRepository,
                                  UserRepository userRepository,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 ZoneCommandRepository zoneCommandRepository,
+                                 HotspotCommandRepository hotspotCommandRepository) {
         this.exhibitionQueryRepository = exhibitionQueryRepository;
         this.exhibitionCommandRepository = exhibitionCommandRepository;
         this.taskQueryRepository = taskQueryRepository;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
+        this.zoneCommandRepository = zoneCommandRepository;
+        this.hotspotCommandRepository = hotspotCommandRepository;
     }
 
     @Override
@@ -59,6 +68,17 @@ public class ExhibitionServiceImpl implements ExhibitionService {
             throw new BusinessException(HttpStatus.FORBIDDEN, 40332, "无权在该任务下创建展厅");
         }
 
+        Long templateId = null;
+        String templateSnapshotJson = null;
+        ExhibitionQueryRepository.TemplatePayload template = null;
+        if (request.templateCode() != null && !request.templateCode().isBlank()) {
+            template = exhibitionQueryRepository.findTemplateByCode(request.templateCode());
+            if (template != null) {
+                templateId = template.id();
+                templateSnapshotJson = template.zonesConfig();
+            }
+        }
+
         Long exhibitionId = exhibitionCommandRepository.createExhibition(
                 userId,
                 request.taskId(),
@@ -66,9 +86,16 @@ public class ExhibitionServiceImpl implements ExhibitionService {
                 normalizeText(request.coverUrl()),
                 normalizeText(request.summary()),
                 normalizeText(request.groupName()),
-                visibility
+                visibility,
+                templateId,
+                templateSnapshotJson
         );
         exhibitionCommandRepository.addOwnerMember(exhibitionId, userId);
+
+        if (template != null) {
+            instantiateTemplate(exhibitionId, templateSnapshotJson);
+        }
+
         return getExhibitionDetail(exhibitionId, userId, role);
     }
 
@@ -447,5 +474,55 @@ public class ExhibitionServiceImpl implements ExhibitionService {
         }
         String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private void instantiateTemplate(Long exhibitionId, String zonesConfigJson) {
+        try {
+            JsonNode root = objectMapper.readTree(zonesConfigJson);
+            JsonNode zonesArray = root.path("zones");
+            if (!zonesArray.isArray()) return;
+
+            Map<String, Long> zoneCodeToId = new HashMap<>();
+            int sortOrder = 0;
+            for (JsonNode zoneNode : zonesArray) {
+                String zoneCode = zoneNode.path("zoneCode").asText();
+                String zoneType = zoneNode.path("zoneType").asText("gallery");
+                String title = zoneNode.path("title").asText("");
+                String backgroundUrl = zoneNode.path("backgroundUrl").asText(null);
+                String transitionIn = zoneNode.path("transitionIn").asText("fade");
+
+                Long zoneId = zoneCommandRepository.createZone(
+                        exhibitionId, zoneCode, zoneType, title,
+                        null, null, sortOrder++,
+                        backgroundUrl, transitionIn);
+                zoneCodeToId.put(zoneCode, zoneId);
+            }
+
+            for (JsonNode zoneNode : zonesArray) {
+                String zoneCode = zoneNode.path("zoneCode").asText();
+                Long zoneId = zoneCodeToId.get(zoneCode);
+                JsonNode hotspots = zoneNode.path("hotspots");
+                if (!hotspots.isArray() || zoneId == null) continue;
+
+                int hsSortOrder = 0;
+                for (JsonNode hs : hotspots) {
+                    String type = hs.path("type").asText("navigation");
+                    String targetZoneCode = hs.path("targetZoneCode").asText(null);
+                    Long targetZoneId = targetZoneCode != null ? zoneCodeToId.get(targetZoneCode) : null;
+                    String icon = hs.path("icon").asText(null);
+                    Double x = hs.has("x") ? hs.path("x").asDouble() : null;
+                    Double y = hs.has("y") ? hs.path("y").asDouble() : null;
+                    Double w = hs.has("w") ? hs.path("w").asDouble() : null;
+                    Double h = hs.has("h") ? hs.path("h").asDouble() : null;
+
+                    hotspotCommandRepository.createHotspot(
+                            zoneId, targetZoneId, type,
+                            null, icon,
+                            x, y, w, h, hsSortOrder++);
+                }
+            }
+        } catch (IOException e) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50020, "模板实例化失败：JSON 解析异常");
+        }
     }
 }

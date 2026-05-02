@@ -167,16 +167,27 @@ CREATE TABLE IF NOT EXISTS media_assets (
 CREATE TABLE IF NOT EXISTS exhibitions (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   task_id BIGINT UNSIGNED DEFAULT NULL COMMENT '关联任务ID',
+  template_id BIGINT UNSIGNED DEFAULT NULL COMMENT '展馆模板ID',
   owner_id BIGINT UNSIGNED NOT NULL COMMENT '发起人ID',
   title VARCHAR(128) NOT NULL COMMENT '展厅标题',
   cover_url VARCHAR(255) DEFAULT NULL COMMENT '封面图',
   summary VARCHAR(500) DEFAULT NULL COMMENT '摘要',
   group_name VARCHAR(128) DEFAULT NULL COMMENT '小组名称',
+  subject VARCHAR(64) DEFAULT NULL COMMENT '学科',
+  grade_level VARCHAR(32) DEFAULT NULL COMMENT '年级',
+  ai_enabled TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'AI功能开关',
+  comment_mode VARCHAR(20) NOT NULL DEFAULT 'free' COMMENT 'free/template/disabled',
   status VARCHAR(20) NOT NULL DEFAULT 'draft' COMMENT '状态：draft/published/archived',
   visibility VARCHAR(20) NOT NULL DEFAULT 'class' COMMENT '可见性：private/class/public',
+  workflow_status VARCHAR(20) NOT NULL DEFAULT 'draft' COMMENT 'draft/submitted/reviewing/returned/approved/published/archived',
+  visibility_scope VARCHAR(20) NOT NULL DEFAULT 'private' COMMENT 'private/class/school/public',
+  is_featured TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否加精推荐',
+  published_version_id BIGINT UNSIGNED DEFAULT NULL COMMENT '当前公开发布版本ID',
+  bundle_revision INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'editor-bundle乐观锁版本号',
+  template_snapshot_json JSON DEFAULT NULL COMMENT '创建时模板快照(仅记录)',
   latest_version_no INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '最新版本号',
   published_version_no INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '已发布版本号',
-  featured_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否加精推荐',
+  featured_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否加精推荐(旧)',
   featured_reason VARCHAR(255) DEFAULT NULL COMMENT '推荐理由',
   featured_at DATETIME DEFAULT NULL COMMENT '推荐时间',
   view_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '浏览数',
@@ -213,6 +224,7 @@ CREATE TABLE IF NOT EXISTS exhibition_versions (
   exhibition_id BIGINT UNSIGNED NOT NULL COMMENT '展厅ID',
   version_no INT UNSIGNED NOT NULL COMMENT '版本号',
   save_type VARCHAR(20) NOT NULL DEFAULT 'manual' COMMENT '保存类型：manual/autosave/publish',
+  version_type VARCHAR(20) NOT NULL DEFAULT 'manual' COMMENT 'autosave/manual/submitted/published',
   version_note VARCHAR(255) DEFAULT NULL COMMENT '版本说明',
   canvas_width INT UNSIGNED NOT NULL DEFAULT 1920 COMMENT '画布宽',
   canvas_height INT UNSIGNED NOT NULL DEFAULT 1080 COMMENT '画布高',
@@ -512,6 +524,215 @@ VALUES
   (4, '红色记忆', 'theme')
 ON DUPLICATE KEY UPDATE
   tag_type = VALUES(tag_type);
+
+-- =============================================
+-- V2 新增表：展区/热点/展品/讲解/互动/模板/互评/提交/审核/日志
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS exhibition_zones (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  exhibition_id   BIGINT UNSIGNED NOT NULL,
+  zone_code       VARCHAR(64)     NOT NULL COMMENT '编码如entrance/gallery-left',
+  zone_type       VARCHAR(32)     NOT NULL COMMENT 'entrance/gallery/closeup/exit/timeline_node/map_point',
+  title           VARCHAR(128)    NOT NULL,
+  subtitle        VARCHAR(255)    DEFAULT NULL,
+  description     TEXT            DEFAULT NULL,
+  background_url  VARCHAR(255)    DEFAULT NULL COMMENT '2.5D场景背景图',
+  background_style JSON           DEFAULT NULL COMMENT 'CSS样式(视差/动画)',
+  layout_config   JSON            DEFAULT NULL COMMENT '展位槽配置',
+  transition_in   VARCHAR(32)     NOT NULL DEFAULT 'fade',
+  narration_text  TEXT            DEFAULT NULL COMMENT '展区讲解词',
+  narration_audio VARCHAR(255)    DEFAULT NULL,
+  canvas_data     JSON            DEFAULT NULL COMMENT 'Fabric画布JSON',
+  sort_order      INT UNSIGNED    NOT NULL DEFAULT 0,
+  assigned_user_id BIGINT UNSIGNED DEFAULT NULL COMMENT '认领人(协作分工)',
+  locked_by       BIGINT UNSIGNED DEFAULT NULL COMMENT '编辑锁(短期互斥)',
+  locked_at       DATETIME        DEFAULT NULL,
+  status          VARCHAR(20)     NOT NULL DEFAULT 'active',
+  created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_exhibition_zone (exhibition_id, zone_code),
+  CONSTRAINT fk_zones_exhibition FOREIGN KEY (exhibition_id) REFERENCES exhibitions (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展区表';
+
+CREATE TABLE IF NOT EXISTS zone_hotspots (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  zone_id         BIGINT UNSIGNED NOT NULL,
+  target_zone_id  BIGINT UNSIGNED DEFAULT NULL,
+  hotspot_type    VARCHAR(32)     NOT NULL COMMENT 'navigation/exhibit_popup/external_link/narration_trigger',
+  label           VARCHAR(64)     DEFAULT NULL,
+  icon            VARCHAR(32)     DEFAULT NULL COMMENT 'arrow-left/arrow-right/zoom-in/info/play',
+  x_percent       DECIMAL(5,2)    NOT NULL,
+  y_percent       DECIMAL(5,2)    NOT NULL,
+  w_percent       DECIMAL(5,2)    NOT NULL DEFAULT 8.00,
+  h_percent       DECIMAL(5,2)    NOT NULL DEFAULT 8.00,
+  style_json      JSON            DEFAULT NULL,
+  action_config   JSON            DEFAULT NULL COMMENT '外链URL/弹窗内容等',
+  sort_order      INT UNSIGNED    NOT NULL DEFAULT 0,
+  created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_hotspots_zone FOREIGN KEY (zone_id) REFERENCES exhibition_zones (id),
+  CONSTRAINT fk_hotspots_target FOREIGN KEY (target_zone_id) REFERENCES exhibition_zones (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展区热点表';
+
+CREATE TABLE IF NOT EXISTS exhibition_exhibits (
+  id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  exhibition_id       BIGINT UNSIGNED NOT NULL,
+  zone_id             BIGINT UNSIGNED NOT NULL,
+  slot_code           VARCHAR(64)     DEFAULT NULL COMMENT '展位槽编码(slot模式)',
+  placement_mode      VARCHAR(16)     NOT NULL DEFAULT 'slot' COMMENT '放置模式: slot(槽位)/free(自由定位)',
+  placement_json      JSON            DEFAULT NULL COMMENT '自由定位坐标',
+  title               VARCHAR(128)    NOT NULL,
+  subtitle            VARCHAR(255)    DEFAULT NULL,
+  exhibit_type        VARCHAR(32)     NOT NULL DEFAULT 'image' COMMENT 'image/video/audio/document/model/text',
+  cover_url           VARCHAR(255)    DEFAULT NULL,
+  media_url           VARCHAR(255)    DEFAULT NULL,
+  source_type         VARCHAR(32)     NOT NULL DEFAULT 'upload' COMMENT 'museum/upload/ai_generated',
+  museum_resource_id  BIGINT UNSIGNED DEFAULT NULL,
+  media_asset_id      BIGINT UNSIGNED DEFAULT NULL,
+  description         TEXT            DEFAULT NULL,
+  source_info         JSON            DEFAULT NULL COMMENT '来源信息JSON',
+  knowledge_points    JSON            DEFAULT NULL COMMENT '知识点JSON',
+  sort_order          INT UNSIGNED    NOT NULL DEFAULT 0,
+  status              VARCHAR(20)     NOT NULL DEFAULT 'active',
+  created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_exhibits_zone (zone_id, sort_order),
+  CONSTRAINT fk_exhibits_exhibition FOREIGN KEY (exhibition_id) REFERENCES exhibitions (id),
+  CONSTRAINT fk_exhibits_zone FOREIGN KEY (zone_id) REFERENCES exhibition_zones (id),
+  CONSTRAINT fk_exhibits_museum FOREIGN KEY (museum_resource_id) REFERENCES museum_resources (id),
+  CONSTRAINT fk_exhibits_asset FOREIGN KEY (media_asset_id) REFERENCES media_assets (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展品表';
+
+CREATE TABLE IF NOT EXISTS exhibit_narrations (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  exhibit_id        BIGINT UNSIGNED NOT NULL,
+  narration_type    VARCHAR(32)     NOT NULL DEFAULT 'text' COMMENT 'text/audio/ai_generated',
+  content           TEXT            NOT NULL,
+  audio_url         VARCHAR(255)    DEFAULT NULL,
+  voice_type        VARCHAR(64)     DEFAULT NULL,
+  duration_seconds  INT UNSIGNED    DEFAULT NULL,
+  sort_order        INT UNSIGNED    NOT NULL DEFAULT 0,
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_narrations_exhibit FOREIGN KEY (exhibit_id) REFERENCES exhibition_exhibits (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展品讲解表';
+
+CREATE TABLE IF NOT EXISTS exhibit_interactions (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  exhibit_id        BIGINT UNSIGNED NOT NULL,
+  interaction_type  VARCHAR(32)     NOT NULL COMMENT 'quiz/open_question/poll',
+  question_text     VARCHAR(500)    NOT NULL,
+  options_json      JSON            DEFAULT NULL,
+  correct_answer    VARCHAR(64)     DEFAULT NULL,
+  explanation       TEXT            DEFAULT NULL,
+  sort_order        INT UNSIGNED    NOT NULL DEFAULT 0,
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_interactions_exhibit FOREIGN KEY (exhibit_id) REFERENCES exhibition_exhibits (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展品互动题表';
+
+CREATE TABLE IF NOT EXISTS exhibition_templates (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  template_code     VARCHAR(64)     NOT NULL,
+  template_name     VARCHAR(128)    NOT NULL,
+  template_type     VARCHAR(32)     NOT NULL COMMENT 'basic_gallery/immersive_2.5d/timeline/map_exploration',
+  difficulty_level  VARCHAR(20)     NOT NULL DEFAULT 'beginner' COMMENT 'beginner/intermediate/advanced',
+  description       TEXT            DEFAULT NULL,
+  preview_url       VARCHAR(255)    DEFAULT NULL,
+  zones_config      JSON            NOT NULL COMMENT '预设展区结构(背景/槽位/热点)',
+  suitable_subjects JSON            DEFAULT NULL,
+  suitable_grades   JSON            DEFAULT NULL,
+  status            VARCHAR(20)     NOT NULL DEFAULT 'active',
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_template_code (template_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展馆模板表';
+
+CREATE TABLE IF NOT EXISTS peer_review_templates (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  task_id       BIGINT UNSIGNED NOT NULL,
+  question_text VARCHAR(500)    NOT NULL,
+  question_type VARCHAR(32)     NOT NULL DEFAULT 'text' COMMENT 'text/rating/choice',
+  options_json  JSON            DEFAULT NULL,
+  sort_order    INT UNSIGNED    NOT NULL DEFAULT 0,
+  created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_prt_task FOREIGN KEY (task_id) REFERENCES tasks (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='互评模板表';
+
+CREATE TABLE IF NOT EXISTS peer_reviews (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  exhibition_id BIGINT UNSIGNED NOT NULL,
+  reviewer_id   BIGINT UNSIGNED NOT NULL,
+  peer_review_template_id BIGINT UNSIGNED DEFAULT NULL COMMENT '关联互评模板问题ID',
+  answer_text   TEXT            DEFAULT NULL,
+  rating        DECIMAL(3,1)    DEFAULT NULL,
+  created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_pr_exhibition FOREIGN KEY (exhibition_id) REFERENCES exhibitions (id),
+  CONSTRAINT fk_pr_reviewer FOREIGN KEY (reviewer_id) REFERENCES users (id),
+  CONSTRAINT fk_pr_template FOREIGN KEY (peer_review_template_id) REFERENCES peer_review_templates (id),
+  UNIQUE KEY uk_peer_review_once (exhibition_id, reviewer_id, peer_review_template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='同伴互评表';
+
+CREATE TABLE IF NOT EXISTS exhibition_submissions (
+  id                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  task_id               BIGINT UNSIGNED NOT NULL COMMENT '任务ID',
+  exhibition_id         BIGINT UNSIGNED NOT NULL COMMENT '展厅ID',
+  submitter_id          BIGINT UNSIGNED NOT NULL COMMENT '提交人ID',
+  submitted_version_id  BIGINT UNSIGNED NOT NULL COMMENT '提交时冻结的版本ID',
+  status                VARCHAR(20)     NOT NULL DEFAULT 'submitted' COMMENT 'submitted/reviewing/returned/approved',
+  submit_count          INT UNSIGNED    NOT NULL DEFAULT 1 COMMENT '第几次提交',
+  submitted_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at           DATETIME        DEFAULT NULL,
+  reviewer_id           BIGINT UNSIGNED DEFAULT NULL COMMENT '审核教师ID',
+  return_reason         TEXT            DEFAULT NULL COMMENT '退回原因',
+  created_at            DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_submissions_task (task_id, status),
+  KEY idx_submissions_exhibition (exhibition_id),
+  UNIQUE KEY uk_submission_round (task_id, exhibition_id, submit_count),
+  CONSTRAINT fk_sub_task FOREIGN KEY (task_id) REFERENCES tasks (id),
+  CONSTRAINT fk_sub_exhibition FOREIGN KEY (exhibition_id) REFERENCES exhibitions (id),
+  CONSTRAINT fk_sub_submitter FOREIGN KEY (submitter_id) REFERENCES users (id),
+  CONSTRAINT fk_sub_version FOREIGN KEY (submitted_version_id) REFERENCES exhibition_versions (id),
+  CONSTRAINT fk_sub_reviewer FOREIGN KEY (reviewer_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展厅提交记录表';
+
+CREATE TABLE IF NOT EXISTS submission_reviews (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  submission_id     BIGINT UNSIGNED NOT NULL COMMENT '提交记录ID',
+  reviewer_id       BIGINT UNSIGNED NOT NULL COMMENT '评审教师ID',
+  scores_json       JSON            NOT NULL COMMENT '多维评分',
+  overall_score     DECIMAL(5,2)    DEFAULT NULL COMMENT '综合得分',
+  overall_comment   TEXT            DEFAULT NULL COMMENT '总评语',
+  ai_suggestion_json JSON           DEFAULT NULL COMMENT 'AI评价建议原始数据',
+  action            VARCHAR(20)     NOT NULL COMMENT 'approve/return',
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_reviews_submission (submission_id),
+  CONSTRAINT fk_review_submission FOREIGN KEY (submission_id) REFERENCES exhibition_submissions (id),
+  CONSTRAINT fk_review_reviewer FOREIGN KEY (reviewer_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提交评审记录表';
+
+CREATE TABLE IF NOT EXISTS exhibition_activity_logs (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  exhibition_id BIGINT UNSIGNED NOT NULL,
+  user_id       BIGINT UNSIGNED NOT NULL,
+  action        VARCHAR(64)     NOT NULL COMMENT 'zone_created/exhibit_added/version_saved/...',
+  zone_id       BIGINT UNSIGNED DEFAULT NULL,
+  detail        JSON            DEFAULT NULL,
+  created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_logs_exhibition (exhibition_id, created_at),
+  CONSTRAINT fk_logs_exhibition FOREIGN KEY (exhibition_id) REFERENCES exhibitions (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展厅操作日志表';
 
 -- 兼容迁移：为旧库的 media_assets 增加 original_file_name 列
 SET @schema_name = DATABASE();

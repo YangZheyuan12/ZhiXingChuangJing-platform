@@ -23,7 +23,8 @@ public final class ExhibitionRequests {
             String coverUrl,
             String visibility,
             @Size(max = 128, message = "小组名称长度不能超过128个字符")
-            String groupName
+            String groupName,
+            String templateCode
     ) {
     }
 

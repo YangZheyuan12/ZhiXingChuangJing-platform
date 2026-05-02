@@ -136,6 +136,10 @@ public class ExhibitionQueryRepository {
                   e.comment_count,
                   e.created_at,
                   e.updated_at,
+                  e.workflow_status,
+                  e.visibility_scope,
+                  e.is_featured,
+                  e.bundle_revision,
                   u.id AS author_id,
                   u.role AS author_role,
                   u.real_name AS author_name,
@@ -170,7 +174,11 @@ public class ExhibitionQueryRepository {
                         findExhibitionTags(rs.getLong("id")),
                         rs.getObject("created_at", LocalDateTime.class),
                         rs.getObject("updated_at", LocalDateTime.class),
-                        findExhibitionMembers(rs.getLong("id"))
+                        findExhibitionMembers(rs.getLong("id")),
+                        rs.getString("workflow_status"),
+                        rs.getString("visibility_scope"),
+                        rs.getBoolean("is_featured"),
+                        rs.getInt("bundle_revision")
                 ), exhibitionId);
         return list.stream().findFirst();
     }
@@ -497,7 +505,8 @@ public class ExhibitionQueryRepository {
                 latestVersionNo,
                 publishedVersionNo,
                 new ExhibitionResponses.ExhibitionStatsResponse(viewCount, likeCount, favoriteCount, commentCount),
-                findExhibitionTags(id)
+                findExhibitionTags(id),
+                null, null, null
         );
     }
 
@@ -536,6 +545,20 @@ public class ExhibitionQueryRepository {
 
     private CommonResponses.SimpleUser buildSimpleUser(Long id, String role, String name, String nickname, String avatarUrl) {
         return new CommonResponses.SimpleUser(id, role, name, nickname, avatarUrl);
+    }
+
+    public record TemplatePayload(Long id, String zonesConfig) {}
+
+    public TemplatePayload findTemplateByCode(String templateCode) {
+        String sql = "SELECT id, zones_config FROM exhibition_templates WHERE template_code = ? AND status = 'active' LIMIT 1";
+        List<TemplatePayload> list = jdbcTemplate.query(sql, (rs, rowNum) ->
+                new TemplatePayload(rs.getLong("id"), rs.getString("zones_config")), templateCode);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public Integer getBundleRevision(Long exhibitionId) {
+        String sql = "SELECT bundle_revision FROM exhibitions WHERE id = ?";
+        return jdbcTemplate.queryForObject(sql, Integer.class, exhibitionId);
     }
 
     private record QuerySpec(
