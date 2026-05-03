@@ -332,7 +332,10 @@ const { canUndo, canRedo, undo, redo } = history
 const autosave = useCanvasAutosave(
   fabricCanvas,
   () => exhibitionId,
-  () => buildLegacySavePayload(),
+  {
+    currentZoneCode: () => currentZone.value?.zoneCode ?? null,
+    getCanvasJson: () => fabricCanvas.value ? (fabricCanvas.value as any).toJSON(CUSTOM_PROPS) : null,
+  },
 )
 const { lastAutosaveAt, autosaveError, autosaving } = autosave
 
@@ -881,16 +884,6 @@ function buildCanvasDataMap(): Record<string, Record<string, unknown>> {
     }
   }
   return map
-}
-
-function buildLegacySavePayload() {
-  const canvas = fabricCanvas.value
-  return {
-    saveType: 'manual' as const,
-    versionNote: '',
-    canvasConfig: { width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT, background: 'transparent', zoom: 1 },
-    versionData: canvas ? (canvas as any).toJSON(CUSTOM_PROPS) : {},
-  }
 }
 
 async function handleSave() {

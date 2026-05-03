@@ -1,15 +1,20 @@
 import { ref, type ShallowRef } from 'vue'
 import type { Canvas } from 'fabric'
-import { saveExhibitionVersion } from '@/api/modules/exhibitions'
-import type { SaveExhibitionVersionRequest } from '@/api/types'
+import { saveDraftBundle } from '@/api/modules/editor-bundle'
 import { isDrawingGuides } from './useAlignmentGuides'
 
 const AUTOSAVE_DELAY_MS = 10_000
+const CUSTOM_PROPS = ['assetType', 'assetId', 'mediaUrl', 'assetName']
+
+export interface AutosaveContext {
+  currentZoneCode: () => string | null
+  getCanvasJson: () => Record<string, unknown> | null
+}
 
 export function useCanvasAutosave(
   fabricCanvas: ShallowRef<Canvas | null>,
   exhibitionId: () => number,
-  buildPayload: () => SaveExhibitionVersionRequest,
+  context?: AutosaveContext,
 ) {
   const lastAutosaveAt = ref<Date | null>(null)
   const autosaveError = ref('')
@@ -39,10 +44,11 @@ export function useCanvasAutosave(
     autosaving.value = true
     autosaveError.value = ''
     try {
-      const payload = buildPayload()
-      payload.saveType = 'autosave'
-      payload.versionNote = '自动保存'
-      await saveExhibitionVersion(exhibitionId(), payload)
+      const zoneCode = context?.currentZoneCode() ?? null
+      if (zoneCode) {
+        const canvasData = context?.getCanvasJson() ?? (fabricCanvas.value as any).toJSON(CUSTOM_PROPS)
+        await saveDraftBundle(exhibitionId(), { zoneCode, canvasData })
+      }
       dirty = false
       lastAutosaveAt.value = new Date()
     } catch (e: unknown) {
