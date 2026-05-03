@@ -21,10 +21,13 @@ npm run dev
 - 数据库：MySQL，确保 `exhibitions.workflow_status` 列存在；
   若提示外键约束错误请先清理孤儿展品（见**已知风险 R1**）。
 
-测试账号（初始数据）：
-- 老师：`teacher_demo / 123456`
-- 学生：`student_demo / 123456`
-- 观众：`visitor_demo / 123456`
+测试账号（初始数据，密码由前端自动 SHA256 后传给后端）：
+- 管理员：`admin / 123456`
+- 老师：`teacher001 / 123456`（昵称「李老师」）
+- 学生 1：`student001 / 123456`（昵称「小明」）
+- 学生 2：`student002 / 123456`（昵称「小红」）
+
+**MySQL 连接**：`127.0.0.1:3306` / `zhixingchuangjing` / `root` / 密码依本地实际为准（dev 配置默认 `123456`，可用环境变量 `SPRING_DATASOURCE_PASSWORD` 覆盖）。首次使用需导入 `backend/src/main/resources/db/seed/mysql-init.sql`。
 
 ---
 
