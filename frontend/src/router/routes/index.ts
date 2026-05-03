@@ -117,6 +117,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '任务详情' },
       },
       {
+        path: 'tasks/:taskId/submissions',
+        name: 'task-submissions',
+        component: () => import('@/views/tasks/TaskSubmissionsView.vue'),
+        meta: { title: '班级作品管理', requiresRole: ['teacher', 'admin'] },
+      },
+      {
         path: 'exhibitions',
         name: 'exhibitions',
         component: () => import('@/views/exhibitions/ExhibitionListView.vue'),

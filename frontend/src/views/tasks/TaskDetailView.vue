@@ -154,7 +154,18 @@
         </div>
 
         <div v-if="canViewSubmissions" class="panel-card p-6">
-          <SectionHeader title="提交记录" description="支持查看每条提交并进入点评详情页。" />
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <SectionHeader title="提交记录" description="支持查看每条提交并进入点评详情页。" />
+            <RouterLink
+              :to="`/tasks/${taskId}/submissions`"
+              class="shrink-0 inline-flex items-center gap-1 rounded-full border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-50"
+            >
+              进入班级作品管理
+              <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+              </svg>
+            </RouterLink>
+          </div>
           <EmptyStatePanel
             v-if="!loading && submissions.length === 0"
             eyebrow="Submissions"
