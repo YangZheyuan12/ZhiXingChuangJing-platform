@@ -4,7 +4,7 @@
 适用系统:   Windows 10 / Windows 11（64 位）
 项目位置:   D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
 目标读者:   从没写过代码、从没部署过项目的同学也能照做
-编写日期:   2026-04-24
+编写日期:   2026-04-24（Phase 3 后端更新: 2026-05-03）
 ================================================================
 
 
@@ -250,24 +250,30 @@
 
 【2-2】初始化数据库
 ─────────────────────────────────────────────────────────────────
-✅ 在 MySQL 里创建 zhixingchuangjing 库 + 24 张表 + 4 个测试账号。
+✅ 在 MySQL 里创建 zhixingchuangjing 库 + 35 张表 + 4 个测试账号。
 
-📋 执行：
+⚠️ 初始化脚本位于 backend/src/main/resources/db/seed/mysql-init.sql
+   （旧版文档写的 deploy/mysql/init.sql 已不适用）
 
-    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' --default-character-set=utf8mb4 -e "source deploy/mysql/init.sql"
+📋 执行（推荐方式——用标准输入喂给 mysql 客户端，中文路径兼容）：
 
-  若你 MySQL 密码不是 123456，把 -p123456 改成 -p你的密码
+    $env:MYSQL_PWD='123456'
+    Get-Content backend\src\main\resources\db\seed\mysql-init.sql -Raw -Encoding UTF8 | mysql -u root --default-character-set=utf8mb4
+
+  若你 MySQL 密码不是 123456，把 $env:MYSQL_PWD='你的真实密码'。
 
 🔍 验证：
   命令执行几秒后返回提示符，没报错就是成功。验证表已建好：
 
-    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "USE zhixingchuangjing; SHOW TABLES;"
+    $env:MYSQL_PWD='123456'
+    mysql -u root -D zhixingchuangjing -e "SELECT COUNT(*) AS tables_cnt FROM information_schema.tables WHERE table_schema='zhixingchuangjing';"
 
-  期望看到 24 行表名（users / exhibitions / tasks / 等）
+  期望看到 tables_cnt = 35
 
-  验证默认账号：
+  验证默认账号（users 表字段是 account，不是 username）：
 
-    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "USE zhixingchuangjing; SELECT username, role FROM users;"
+    $env:MYSQL_PWD='123456'
+    mysql -u root -D zhixingchuangjing -e "SELECT account, role, nickname FROM users;"
 
   期望看到 4 行：admin / teacher001 / student001 / student002
 
@@ -321,15 +327,24 @@
 
 【3-1】窗口 1 —— 启动后端
 ─────────────────────────────────────────────────────────────────
-📋 执行：
+📋 执行（密码 = 123456 时）：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
     java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
 
-  ⏰ 启动 5~15 秒
+  ⏰ 启动 15~35 秒（首次更慢，需要 JIT 预热）
+
+  若你 MySQL 密码不是 123456（不想改 application-dev.yml 的话）：
+
+    cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform\backend
+    $env:SPRING_DATASOURCE_PASSWORD='你的真实密码'
+    java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar target/platform-backend-0.0.1-SNAPSHOT.jar
+
+  （环境变量只在当前 PowerShell 窗口有效，关窗口就失效）
 
 🔍 验证：
   日志最后出现：
+      Tomcat started on port 8080 (http) with context path '/'
       Started ZhiXingChuangJingApplication in X seconds ...
 
   窗口会一直停在运行状态（不返回提示符）
@@ -372,14 +387,21 @@
 【默认测试账号（密码全部是 123456）】
 ─────────────────────────────────────────────────────────────────
 
-  ┌──────────────┬────────┬────────────────────────┐
-  │ 用户名       │ 角色   │ 登录后会进入           │
-  ├──────────────┼────────┼────────────────────────┤
-  │ admin        │ 管理员 │ 深色的管理后台         │
-  │ teacher001   │ 教师   │ 创作端工作台           │
-  │ student001   │ 学生   │ 创作端工作台           │
-  │ student002   │ 学生   │ 创作端工作台           │
-  └──────────────┴────────┴────────────────────────┘
+  ┌──────────────┬────────┬────────────────────────┬──────────┐
+  │ 登录账号     │ 角色   │ 登录后会进入           │ 昵称     │
+  ├──────────────┼────────┼────────────────────────┼──────────┤
+  │ admin        │ 管理员 │ 深色的管理后台         │ 管理员   │
+  │ teacher001   │ 教师   │ 创作端工作台           │ 李老师   │
+  │ student001   │ 学生   │ 创作端工作台           │ 小明     │
+  │ student002   │ 学生   │ 创作端工作台           │ 小红     │
+  └──────────────┴────────┴────────────────────────┴──────────┘
+
+💡 密码传输机制：
+   前端会先把明文密码做 SHA-256，再发给后端（后端也按 SHA-256 做 bcrypt 校验）。
+   这意味着：
+   - 浏览器里输明文 123456 即可，前端会自动加密
+   - 用 Postman / curl 直接测后端接口时，要先手动 sha256(123456) 再传
+     sha256("123456") = 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
 
 
 ═════════════════════════════════════════════════════════════════
@@ -403,15 +425,22 @@
 
 ⏰ 二次打包只需 5~30 秒
 
+⚠️ 打包前必须先停后端进程！否则 jar 文件被占用会报
+   "Unable to rename ... .jar.original"。手动清残留：
+       Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force
+
 
 【数据库结构变更】
 ─────────────────────────────────────────────────────────────────
-开发者通知你"数据库表改了"时执行：
+开发者通知你"数据库表改了"时执行（同【2-2】初始化，幂等）：
 
     cd D:\Desktop\计算机设计大赛\ZhiXingChuangJing-Platform
-    mysql -uroot -p123456 '-h127.0.0.1' '-P3306' --default-character-set=utf8mb4 -e "source deploy/mysql/init.sql"
+    $env:MYSQL_PWD='123456'
+    Get-Content backend\src\main\resources\db\seed\mysql-init.sql -Raw -Encoding UTF8 | mysql -u root --default-character-set=utf8mb4
 
-脚本是**幂等的**（可重复跑），不会破坏已有数据。
+脚本是**幂等的**（CREATE TABLE IF NOT EXISTS），不会破坏已有数据。
+如果有增量迁移脚本（backend/src/main/resources/db/migration/V*.sql），
+按版本号顺序手动跑一遍即可。
 
 
 ═════════════════════════════════════════════════════════════════
@@ -465,19 +494,23 @@
     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "..."
 
 
-【E】后端启动报 "Communications link failure"
+【E】后端启动报 "Communications link failure" 或 "Access denied for user 'root'"
 ─────────────────────────────────────────────────────────────────
 原因：MySQL 没跑 / 密码不对 / 库不存在
 解决：
   1. Get-Service MySQL80   确认 Running
      如果 Stopped：Start-Service MySQL80
-  2. 测密码：
-     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "SELECT 1"
+  2. 测密码（如果 MYSQL_PWD 环境变量没设，-p 后直接跟密码）：
+     $env:MYSQL_PWD='123456'; mysql -u root -e "SELECT 1"
   3. 测库是否存在：
-     mysql -uroot -p123456 '-h127.0.0.1' '-P3306' -e "SHOW DATABASES;"
+     $env:MYSQL_PWD='123456'; mysql -u root -e "SHOW DATABASES;"
      没看到 zhixingchuangjing 就回去跑【2-2】初始化
-  4. 若密码不是 123456，改 backend/src/main/resources/application-dev.yml
-     里的 password 字段，然后重新【2-3】打包
+  4. 若密码不是 123456，两种方案任选：
+     A. 改 backend/src/main/resources/application-dev.yml 的 password 字段，
+        然后重新 mvn package 打包（会提交到 git，慎用）
+     B. 启动时传环境变量（推荐，不污染仓库）：
+          $env:SPRING_DATASOURCE_PASSWORD='你的真实密码'
+          java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' -jar ...
 
 
 【F】后端启动报 "Cannot connect to Redis"
@@ -515,9 +548,23 @@
 
 【J】前端请求后端报 CORS 错误
 ─────────────────────────────────────────────────────────────────
-原因：前端地址不在后端白名单里
+原因 1：前端地址不在后端白名单里
 解决：改 backend/src/main/resources/application.yml 的
     app.cors.allowed-origins，加进新地址后重新打包后端
+
+原因 2：使用了 Phase 3 之前的旧 jar（Spring Security 6 未绑定 CORS 过滤器）
+症状：OPTIONS 预检 200 OK 但响应没带 Access-Control-Allow-Origin 头
+解决：拉取 commit 786bfea 及之后的代码，重新 mvn package 打包。
+      新版 CorsConfig 暴露 CorsConfigurationSource Bean，Spring Security
+      会自动串入 CORS 过滤器。
+
+快速验证 CORS 是否就绪：
+    Invoke-WebRequest -Uri 'http://127.0.0.1:8080/api/v1/auth/login' `
+      -Method Options -UseBasicParsing `
+      -Headers @{'Origin'='http://localhost:5173';`
+                 'Access-Control-Request-Method'='POST';`
+                 'Access-Control-Request-Headers'='content-type'}
+响应 Headers 应包含 Access-Control-Allow-Origin = http://localhost:5173。
 
 
 【K】浏览器打开 http://localhost:5173 显示"无法访问此网站"
@@ -624,7 +671,8 @@ MinIO 对象存储（可选，只影响文件上传）
   │   ├── package.json         npm 依赖清单
   │   └── node_modules/        依赖（npm install 后生成）
   │
-  ├── deploy/mysql/init.sql    数据库初始化脚本
+  ├── backend/src/main/resources/db/seed/mysql-init.sql   数据库初始化脚本
+  ├── backend/src/main/resources/db/migration/V*.sql      增量迁移脚本
   ├── docs/                    项目文档
   └── 启动流程.txt             你正在看的这份文档
 
