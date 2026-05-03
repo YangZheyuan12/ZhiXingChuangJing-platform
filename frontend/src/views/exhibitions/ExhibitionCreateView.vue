@@ -64,12 +64,24 @@
                 :class="{ 'template-card-active': exhibitionForm.templateCode === tpl.templateCode }"
                 @click="exhibitionForm.templateCode = tpl.templateCode"
               >
-                <img v-if="tpl.previewUrl" :src="tpl.previewUrl" class="h-24 w-full rounded-lg object-cover" />
-                <div v-else class="flex h-24 items-center justify-center rounded-lg bg-red-50 text-sm text-red-300">{{ tpl.templateType }}</div>
+                <img
+                  v-if="tpl.previewUrl && !brokenPreview.has(tpl.templateCode)"
+                  :src="tpl.previewUrl"
+                  class="h-24 w-full rounded-lg object-cover"
+                  @error="brokenPreview.add(tpl.templateCode)"
+                />
+                <div
+                  v-else
+                  class="flex h-24 flex-col items-center justify-center gap-1 rounded-lg bg-stone-50 text-stone-400"
+                >
+                  <span class="text-xs font-semibold tracking-wide text-stone-500">{{ getTemplateTypeLabel(tpl.templateType) }}</span>
+                  <span class="text-[10px] text-stone-400">封面图待补充</span>
+                </div>
                 <p class="mt-2 text-sm font-medium text-stone-700">{{ tpl.templateName }}</p>
+                <p class="line-clamp-2 text-[11px] leading-4 text-stone-500">{{ tpl.description }}</p>
                 <div class="flex gap-1.5">
-                  <span class="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500">{{ tpl.templateType }}</span>
-                  <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-600">{{ tpl.difficultyLevel }}</span>
+                  <span class="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500">{{ getTemplateTypeLabel(tpl.templateType) }}</span>
+                  <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-600">{{ getDifficultyLabel(tpl.difficultyLevel) }}</span>
                 </div>
               </button>
             </div>
@@ -207,6 +219,30 @@ const errorMessage = ref('')
 const exhibitions = ref<ExhibitionSummary[]>([])
 const taskOptions = ref<TaskSummary[]>([])
 const templates = ref<ExhibitionTemplate[]>([])
+const brokenPreview = reactive(new Set<string>())
+
+const TEMPLATE_TYPE_LABELS: Record<string, string> = {
+  basic_gallery: '基础画廊',
+  'immersive_2.5d': '2.5D 沉浸',
+  timeline: '时间轴',
+  map_exploration: '地图探索',
+}
+
+const DIFFICULTY_LABELS: Record<string, string> = {
+  beginner: '入门',
+  intermediate: '进阶',
+  advanced: '高阶',
+}
+
+function getTemplateTypeLabel(type?: string | null): string {
+  if (!type) return '通用模板'
+  return TEMPLATE_TYPE_LABELS[type] ?? type
+}
+
+function getDifficultyLabel(level?: string | null): string {
+  if (!level) return '通用'
+  return DIFFICULTY_LABELS[level] ?? level
+}
 
 const exhibitionForm = reactive({
   taskId: '',

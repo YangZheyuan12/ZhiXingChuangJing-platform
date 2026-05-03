@@ -1,5 +1,7 @@
 package com.zhixingchuangjing.platform.repository;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhixingchuangjing.platform.model.response.CommonResponses;
 import com.zhixingchuangjing.platform.model.response.CommunityResponses;
 import com.zhixingchuangjing.platform.model.response.ExhibitionResponses;
@@ -8,16 +10,23 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
 public class ExhibitionQueryRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
-    public ExhibitionQueryRepository(JdbcTemplate jdbcTemplate) {
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
+
+    public ExhibitionQueryRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public boolean canAccessExhibition(Long exhibitionId, Long userId, String role) {
@@ -554,6 +563,51 @@ public class ExhibitionQueryRepository {
         List<TemplatePayload> list = jdbcTemplate.query(sql, (rs, rowNum) ->
                 new TemplatePayload(rs.getLong("id"), rs.getString("zones_config")), templateCode);
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    public List<ExhibitionResponses.ExhibitionTemplateResponse> listActiveTemplates() {
+        String sql = """
+                SELECT id, template_code, template_name, template_type, difficulty_level,
+                       description, preview_url, zones_config, suitable_subjects, suitable_grades, status
+                FROM exhibition_templates
+                WHERE status = 'active'
+                ORDER BY id ASC
+                """;
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new ExhibitionResponses.ExhibitionTemplateResponse(
+                rs.getLong("id"),
+                rs.getString("template_code"),
+                rs.getString("template_name"),
+                rs.getString("template_type"),
+                rs.getString("difficulty_level"),
+                rs.getString("description"),
+                rs.getString("preview_url"),
+                parseJsonObject(rs.getString("zones_config")),
+                parseJsonStringList(rs.getString("suitable_subjects")),
+                parseJsonStringList(rs.getString("suitable_grades")),
+                rs.getString("status")
+        ));
+    }
+
+    private Map<String, Object> parseJsonObject(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, MAP_TYPE);
+        } catch (Exception ex) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private List<String> parseJsonStringList(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(json, STRING_LIST_TYPE);
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
     }
 
     public Integer getBundleRevision(Long exhibitionId) {

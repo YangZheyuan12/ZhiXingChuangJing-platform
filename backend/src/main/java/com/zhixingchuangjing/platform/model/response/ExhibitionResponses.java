@@ -154,4 +154,19 @@ public final class ExhibitionResponses {
             List<CommunityResponses.CommentResponse> comments
     ) {
     }
+
+    public record ExhibitionTemplateResponse(
+            Long id,
+            String templateCode,
+            String templateName,
+            String templateType,
+            String difficultyLevel,
+            String description,
+            String previewUrl,
+            Map<String, Object> zonesConfig,
+            List<String> suitableSubjects,
+            List<String> suitableGrades,
+            String status
+    ) {
+    }
 }
