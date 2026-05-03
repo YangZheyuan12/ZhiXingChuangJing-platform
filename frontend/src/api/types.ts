@@ -452,6 +452,31 @@ export interface CreateSubmissionReviewRequest {
   isPublic?: boolean
 }
 
+export interface ApproveSubmissionRequest {
+  score?: number | null
+  comment?: string | null
+}
+
+export interface ReturnSubmissionRequest {
+  reason?: string | null
+}
+
+export type NarrationStyle = 'narrative' | 'academic' | 'storytelling' | 'conversational'
+
+export interface GenerateNarrationRequest {
+  exhibitTitle: string
+  exhibitDescription?: string | null
+  knowledgePoints?: string[] | null
+  targetGrade?: string | null
+  style?: NarrationStyle | null
+  maxLength?: number | null
+}
+
+export interface GenerateNarrationResponse {
+  narration: string
+  suggestions?: string[] | null
+}
+
 export interface Comment {
   id: number
   exhibitionId?: number
