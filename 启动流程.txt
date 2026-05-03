@@ -548,23 +548,62 @@
 
 【J】前端请求后端报 CORS 错误
 ─────────────────────────────────────────────────────────────────
-原因 1：前端地址不在后端白名单里
-解决：改 backend/src/main/resources/application.yml 的
-    app.cors.allowed-origins，加进新地址后重新打包后端
+症状：浏览器控制台报
+    "已拦截跨源请求：同源策略禁止读取位于 http://localhost:8080/... 的远程资源"
+    "CORS 头缺少 'Access-Control-Allow-Origin'，状态码：403"
 
-原因 2：使用了 Phase 3 之前的旧 jar（Spring Security 6 未绑定 CORS 过滤器）
+⚠️ **最常见原因（坑 1）**：通过 IDE 的"浏览器预览"代理地址打开前端
+─────────────────────────────────────────────────────────────────
+Windsurf / Cursor / VSCode 等 IDE 有内置浏览器预览功能，会把前端通过
+一个本地代理（例如 http://127.0.0.1:13964）转发。这样浏览器里看到的
+Origin 就是 127.0.0.1:13964，而不是 localhost:5173，后端白名单不包含
+这个代理地址 → CORS 被拒。
+
+✅ 解决：**在系统浏览器（Chrome / Edge / Firefox）的地址栏手动输入**：
+
+    http://localhost:5173
+
+不要点 IDE 面板里那个"Open Preview"按钮。IDE 的预览窗口只适合看页面
+静态效果，涉及登录、API 调用等真实交互必须用系统浏览器直接访问。
+
+原因 2：前端地址不在后端白名单里（真的改了端口或用了别的域名）
+─────────────────────────────────────────────────────────────────
+解决：改 backend/src/main/resources/application.yml 的
+    app.cors.allowed-origins，加进新地址后重新打包后端。
+    多个地址用英文逗号分隔，如：
+        allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.100:5173
+
+原因 3：使用了 Phase 3 之前的旧 jar（Spring Security 6 未绑定 CORS 过滤器）
+─────────────────────────────────────────────────────────────────
 症状：OPTIONS 预检 200 OK 但响应没带 Access-Control-Allow-Origin 头
 解决：拉取 commit 786bfea 及之后的代码，重新 mvn package 打包。
       新版 CorsConfig 暴露 CorsConfigurationSource Bean，Spring Security
       会自动串入 CORS 过滤器。
 
-快速验证 CORS 是否就绪：
+🔧 诊断流程（遇到 CORS 报错后一步步排查）：
+
+1. 看浏览器地址栏显示什么？
+   - 是 http://localhost:5173 或 http://127.0.0.1:5173 → 跳到第 2 步
+   - 是 http://127.0.0.1:139xx 或其他端口 → 你在用 IDE 代理（坑 1），
+     换系统浏览器直接访问 http://localhost:5173
+
+2. PS 里测后端 CORS 响应：
     Invoke-WebRequest -Uri 'http://127.0.0.1:8080/api/v1/auth/login' `
       -Method Options -UseBasicParsing `
       -Headers @{'Origin'='http://localhost:5173';`
                  'Access-Control-Request-Method'='POST';`
                  'Access-Control-Request-Headers'='content-type'}
-响应 Headers 应包含 Access-Control-Allow-Origin = http://localhost:5173。
+
+   响应 Headers 应包含：
+       Access-Control-Allow-Origin = http://localhost:5173
+       Access-Control-Allow-Methods = POST
+       Access-Control-Allow-Credentials = true
+
+   - 有这些头 → 后端 CORS 正常，问题在浏览器那一端（看第 1 步）
+   - 没有这些头 → 后端是旧 jar（原因 3），重新打包
+
+3. 若第 2 步返回 403 Forbidden：说明你传的 Origin 不在白名单，
+   按原因 2 补全 allowed-origins。
 
 
 【K】浏览器打开 http://localhost:5173 显示"无法访问此网站"
