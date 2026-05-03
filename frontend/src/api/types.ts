@@ -183,6 +183,9 @@ export interface ExhibitionSummary {
   publishedVersionNo: number
   stats: ExhibitionStats
   tags: string[]
+  workflowStatus?: string | null
+  visibilityScope?: string | null
+  isFeatured?: boolean | null
 }
 
 export interface CommunityExhibition {
@@ -226,6 +229,7 @@ export interface ExhibitionDetail extends ExhibitionSummary {
   createdAt: string
   updatedAt: string
   collaborators: ExhibitionMember[]
+  bundleRevision?: number | null
 }
 
 export interface CreateExhibitionRequest {
@@ -235,6 +239,7 @@ export interface CreateExhibitionRequest {
   coverUrl?: string | null
   visibility?: 'private' | 'class' | 'public'
   groupName?: string | null
+  templateCode?: string | null
 }
 
 export interface UpdateExhibitionRequest {
@@ -537,4 +542,214 @@ export interface UserHomepage {
   user: UserProfile
   stats: UserHomepageStats
   portfolio: PortfolioItem[]
+}
+
+// ═══ 展区 (Zone) ═══
+
+export interface ZoneSummary {
+  id: number
+  exhibitionId: number
+  zoneCode: string
+  zoneType: string
+  title: string
+  sortOrder: number
+  status: string
+}
+
+export interface ZoneDetail extends ZoneSummary {
+  subtitle?: string | null
+  description?: string | null
+  backgroundUrl?: string | null
+  backgroundStyle?: Record<string, unknown> | null
+  layoutConfig?: { slots: SlotConfig[] } | null
+  transitionIn: string
+  narrationText?: string | null
+  narrationAudio?: string | null
+  canvasData?: Record<string, unknown> | null
+  assignedUserId?: number | null
+  lockedBy?: number | null
+  lockedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SlotConfig {
+  code: string
+  x: number
+  y: number
+  w: number
+  h: number
+  label: string
+}
+
+export interface CreateZoneRequest {
+  zoneCode: string
+  zoneType: string
+  title: string
+  subtitle?: string | null
+  description?: string | null
+  sortOrder?: number
+  backgroundUrl?: string | null
+  transitionIn?: string
+}
+
+export interface UpdateZoneRequest {
+  title?: string
+  subtitle?: string | null
+  description?: string | null
+  backgroundUrl?: string | null
+  backgroundStyle?: Record<string, unknown> | null
+  transitionIn?: string
+  narrationText?: string | null
+  narrationAudio?: string | null
+  canvasData?: Record<string, unknown> | null
+}
+
+// ═══ 展品 (Exhibit) ═══
+
+export interface ExhibitSummary {
+  id: number
+  exhibitionId: number
+  zoneId: number
+  title: string
+  exhibitType: string
+  coverUrl?: string | null
+  sortOrder: number
+  status: string
+}
+
+export interface ExhibitDetail extends ExhibitSummary {
+  slotCode?: string | null
+  placementMode: string
+  placementJson?: Record<string, unknown> | null
+  subtitle?: string | null
+  mediaUrl?: string | null
+  sourceType: string
+  museumResourceId?: number | null
+  mediaAssetId?: number | null
+  description?: string | null
+  sourceInfo?: Record<string, unknown> | null
+  knowledgePoints?: string[] | null
+  narrations: ExhibitNarration[]
+  interactions: ExhibitInteraction[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExhibitNarration {
+  id: number
+  exhibitId: number
+  narrationType: string
+  content: string
+  audioUrl?: string | null
+  voiceType?: string | null
+  durationSeconds?: number | null
+  sortOrder: number
+}
+
+export interface ExhibitInteraction {
+  id: number
+  exhibitId: number
+  interactionType: string
+  questionText: string
+  optionsJson?: Record<string, unknown> | null
+  correctAnswer?: string | null
+  explanation?: string | null
+  sortOrder: number
+}
+
+export interface CreateExhibitRequest {
+  zoneId: number
+  slotCode?: string | null
+  placementMode?: string
+  placementJson?: Record<string, unknown> | null
+  title: string
+  subtitle?: string | null
+  exhibitType?: string
+  coverUrl?: string | null
+  mediaUrl?: string | null
+  sourceType?: string
+  museumResourceId?: number | null
+  mediaAssetId?: number | null
+  description?: string | null
+  sourceInfo?: Record<string, unknown> | null
+  knowledgePoints?: string[] | null
+}
+
+export interface UpdateExhibitRequest {
+  title?: string
+  subtitle?: string | null
+  slotCode?: string | null
+  placementMode?: string
+  placementJson?: Record<string, unknown> | null
+  exhibitType?: string
+  coverUrl?: string | null
+  mediaUrl?: string | null
+  description?: string | null
+  sourceInfo?: Record<string, unknown> | null
+  knowledgePoints?: string[] | null
+}
+
+// ═══ 热点 (Hotspot) ═══
+
+export interface HotspotDetail {
+  id: number
+  zoneId: number
+  targetZoneId?: number | null
+  hotspotType: string
+  label?: string | null
+  icon?: string | null
+  xPercent: number
+  yPercent: number
+  wPercent: number
+  hPercent: number
+  styleJson?: Record<string, unknown> | null
+  actionConfig?: Record<string, unknown> | null
+  sortOrder: number
+}
+
+// ═══ 模板 (Template) ═══
+
+export interface ExhibitionTemplate {
+  id: number
+  templateCode: string
+  templateName: string
+  templateType: string
+  difficultyLevel: string
+  description?: string | null
+  previewUrl?: string | null
+  zonesConfig: Record<string, unknown>
+  suitableSubjects?: string[] | null
+  suitableGrades?: string[] | null
+  status: string
+}
+
+// ═══ Editor Bundle ═══
+
+export interface EditorBundleResponse {
+  exhibition: ExhibitionDetail
+  zones: ZoneDetail[]
+  exhibits: ExhibitDetail[]
+  hotspots: HotspotDetail[]
+  digitalHuman?: DigitalHuman | null
+  template?: ExhibitionTemplate | null
+  revision: number | null
+}
+
+export interface SaveBundleRequest {
+  revision: number | null
+  zones?: UpdateZoneRequest[] | null
+  exhibits?: UpdateExhibitRequest[] | null
+  canvasDataMap?: Record<string, Record<string, unknown>> | null
+}
+
+export interface SaveBundleResult {
+  revision: number
+}
+
+export interface DraftBundleRequest {
+  zoneCode: string
+  canvasData?: Record<string, unknown> | null
+  zoneMetadata?: UpdateZoneRequest | null
+  exhibits?: UpdateExhibitRequest[] | null
 }

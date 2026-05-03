@@ -5,6 +5,7 @@ import type {
   DigitalHuman,
   ExhibitionDetail,
   ExhibitionMember,
+  ExhibitionTemplate,
   ExhibitionVersion,
   ExhibitionViewerData,
   ExhibitionSummary,
@@ -61,4 +62,8 @@ export function getExhibitionDigitalHuman(exhibitionId: number) {
 
 export function upsertExhibitionDigitalHuman(exhibitionId: number, payload: UpsertDigitalHumanRequest) {
   return http.put<DigitalHuman>(`/exhibitions/${exhibitionId}/digital-human`, payload)
+}
+
+export function getExhibitionTemplates() {
+  return http.get<ExhibitionTemplate[]>('/exhibition-templates')
 }
