@@ -47,4 +47,22 @@ public class SubmissionController extends BaseController {
                 request
         ));
     }
+
+    @PostMapping("/{submissionId}/approve")
+    public ApiResponse<Void> approveSubmission(
+            @PathVariable Long submissionId,
+            @AuthenticationPrincipal SecurityUserDetails currentUser,
+            @Valid @RequestBody SubmissionRequests.ApproveSubmissionRequest request) {
+        submissionService.approveSubmission(submissionId, currentUser.getId(), currentUser.getRole(), request);
+        return successMessage("提交审核已通过");
+    }
+
+    @PostMapping("/{submissionId}/return")
+    public ApiResponse<Void> returnSubmission(
+            @PathVariable Long submissionId,
+            @AuthenticationPrincipal SecurityUserDetails currentUser,
+            @Valid @RequestBody SubmissionRequests.ReturnSubmissionRequest request) {
+        submissionService.returnSubmission(submissionId, currentUser.getId(), currentUser.getRole(), request);
+        return successMessage("提交已退回");
+    }
 }

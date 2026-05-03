@@ -157,6 +157,7 @@ public class ExhibitionCommandRepository {
         String sql = """
                 UPDATE exhibitions
                 SET status = 'published',
+                    workflow_status = 'published',
                     visibility = ?,
                     published_version_no = ?,
                     published_at = NOW(),

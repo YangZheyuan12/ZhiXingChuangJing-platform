@@ -19,4 +19,19 @@ public final class SubmissionRequests {
             Boolean isPublic
     ) {
     }
+
+    public record ApproveSubmissionRequest(
+            @DecimalMin(value = "0.0", message = "评分不能小于0")
+            @DecimalMax(value = "100.0", message = "评分不能大于100")
+            Double score,
+            @Size(max = 2000, message = "评语长度不能超过2000个字符")
+            String comment
+    ) {
+    }
+
+    public record ReturnSubmissionRequest(
+            @Size(max = 2000, message = "退回原因长度不能超过2000个字符")
+            String reason
+    ) {
+    }
 }

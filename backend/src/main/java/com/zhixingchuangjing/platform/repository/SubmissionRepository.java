@@ -220,6 +220,28 @@ public class SubmissionRepository {
         return list.isEmpty() ? null : list.get(0);
     }
 
+    public Long findExhibitionIdBySubmissionId(Long submissionId) {
+        List<Long> list = jdbcTemplate.query("SELECT exhibition_id FROM task_submissions WHERE id = ? LIMIT 1",
+                (rs, rowNum) -> rs.getLong("exhibition_id"), submissionId);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    public void updateSubmissionStatus(Long submissionId, String status) {
+        jdbcTemplate.update("""
+                UPDATE task_submissions
+                SET submission_status = ?, updated_at = NOW()
+                WHERE id = ?
+                """, status, submissionId);
+    }
+
+    public void updateWorkflowStatus(Long exhibitionId, String status) {
+        jdbcTemplate.update("""
+                UPDATE exhibitions
+                SET workflow_status = ?, updated_at = NOW()
+                WHERE id = ?
+                """, status, exhibitionId);
+    }
+
     private Long findExistingReviewId(Long submissionId, Long reviewerId) {
         List<Long> ids = jdbcTemplate.query("""
                 SELECT id

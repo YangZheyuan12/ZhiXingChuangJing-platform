@@ -13,4 +13,14 @@ public interface SubmissionService {
                                                                        String role,
                                                                        String nickname,
                                                                        SubmissionRequests.CreateSubmissionReviewRequest request);
+
+    void approveSubmission(Long submissionId,
+                           Long userId,
+                           String role,
+                           SubmissionRequests.ApproveSubmissionRequest request);
+
+    void returnSubmission(Long submissionId,
+                          Long userId,
+                          String role,
+                          SubmissionRequests.ReturnSubmissionRequest request);
 }

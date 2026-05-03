@@ -128,6 +128,8 @@ public class TaskServiceImpl implements TaskService {
                 exhibition.latestVersionNo(),
                 normalizeText(request.submitRemark())
         );
+        // 同步展厅 workflow_status = 'submitted'（详见 docs §14.2）
+        submissionRepository.updateWorkflowStatus(request.exhibitionId(), "submitted");
         return submissionRepository.findSubmissionDetail(submissionId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50012, "提交记录创建失败"));
     }
