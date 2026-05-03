@@ -5,6 +5,8 @@ export interface CanvasShortcutHandlers {
   undo: () => void
   redo: () => void
   save: () => void
+  prevZone?: () => void
+  nextZone?: () => void
 }
 
 const CUSTOM_PROPS = ['assetType', 'assetId', 'mediaUrl', 'assetName']
@@ -66,6 +68,18 @@ export function useCanvasShortcuts(
     if (ctrl && e.key === 'd') {
       e.preventDefault()
       await duplicateSelected(canvas)
+      return
+    }
+
+    if (e.key === 'PageUp' || e.key === '[') {
+      e.preventDefault()
+      handlers.prevZone?.()
+      return
+    }
+
+    if (e.key === 'PageDown' || e.key === ']') {
+      e.preventDefault()
+      handlers.nextZone?.()
       return
     }
   }

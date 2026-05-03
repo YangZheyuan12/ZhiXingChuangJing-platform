@@ -3,19 +3,42 @@ import type { Canvas } from 'fabric'
 import { isDrawingGuides } from './useAlignmentGuides'
 
 const MAX_STACK_SIZE = 50
+const CUSTOM_PROPS = ['assetType', 'assetId', 'mediaUrl', 'assetName']
+
+interface ZoneStack {
+  undo: string[]
+  redo: string[]
+}
 
 export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
-  const undoStack = ref<string[]>([])
-  const redoStack = ref<string[]>([])
   const canUndo = ref(false)
   const canRedo = ref(false)
 
   let isReplaying = false
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
+  // ─── per-zone history stacks ───
+  const stacks = new Map<string, ZoneStack>()
+  let currentZoneKey = '__default__'
+
+  function getStack(): ZoneStack {
+    let s = stacks.get(currentZoneKey)
+    if (!s) {
+      s = { undo: [], redo: [] }
+      stacks.set(currentZoneKey, s)
+    }
+    return s
+  }
+
   function refreshFlags() {
-    canUndo.value = undoStack.value.length > 1
-    canRedo.value = redoStack.value.length > 0
+    const s = getStack()
+    canUndo.value = s.undo.length > 1
+    canRedo.value = s.redo.length > 0
+  }
+
+  function switchZone(zoneKey: string) {
+    currentZoneKey = zoneKey
+    refreshFlags()
   }
 
   function takeSnapshot() {
@@ -23,35 +46,38 @@ export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       if (!fabricCanvas.value) return
-      const json = JSON.stringify((fabricCanvas.value as any).toJSON(['assetType', 'assetId', 'mediaUrl', 'assetName']))
-      if (undoStack.value.length > 0 && undoStack.value[undoStack.value.length - 1] === json) return
-      undoStack.value.push(json)
-      if (undoStack.value.length > MAX_STACK_SIZE) {
-        undoStack.value.splice(0, undoStack.value.length - MAX_STACK_SIZE)
+      const s = getStack()
+      const json = JSON.stringify((fabricCanvas.value as any).toJSON(CUSTOM_PROPS))
+      if (s.undo.length > 0 && s.undo[s.undo.length - 1] === json) return
+      s.undo.push(json)
+      if (s.undo.length > MAX_STACK_SIZE) {
+        s.undo.splice(0, s.undo.length - MAX_STACK_SIZE)
       }
-      redoStack.value = []
+      s.redo = []
       refreshFlags()
     }, 200)
   }
 
   function reset() {
-    undoStack.value = []
-    redoStack.value = []
+    const s = getStack()
+    s.undo = []
+    s.redo = []
     if (fabricCanvas.value) {
-      const json = JSON.stringify((fabricCanvas.value as any).toJSON(['assetType', 'assetId', 'mediaUrl', 'assetName']))
-      undoStack.value.push(json)
+      const json = JSON.stringify((fabricCanvas.value as any).toJSON(CUSTOM_PROPS))
+      s.undo.push(json)
     }
     refreshFlags()
   }
 
   async function undo() {
-    if (!canUndo.value || !fabricCanvas.value) return
+    const s = getStack()
+    if (s.undo.length <= 1 || !fabricCanvas.value) return
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
     isReplaying = true
     try {
-      const current = undoStack.value.pop()!
-      redoStack.value.push(current)
-      const prev = undoStack.value[undoStack.value.length - 1]
+      const current = s.undo.pop()!
+      s.redo.push(current)
+      const prev = s.undo[s.undo.length - 1]
       await fabricCanvas.value.loadFromJSON(prev)
       fabricCanvas.value.requestRenderAll()
     } finally {
@@ -61,12 +87,13 @@ export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
   }
 
   async function redo() {
-    if (!canRedo.value || !fabricCanvas.value) return
+    const s = getStack()
+    if (s.redo.length === 0 || !fabricCanvas.value) return
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
     isReplaying = true
     try {
-      const next = redoStack.value.pop()!
-      undoStack.value.push(next)
+      const next = s.redo.pop()!
+      s.undo.push(next)
       await fabricCanvas.value.loadFromJSON(next)
       fabricCanvas.value.requestRenderAll()
     } finally {
@@ -97,6 +124,7 @@ export function useCanvasHistory(fabricCanvas: ShallowRef<Canvas | null>) {
     undo,
     redo,
     reset,
+    switchZone,
     takeSnapshot,
     bindCanvasEvents,
     unbindCanvasEvents,

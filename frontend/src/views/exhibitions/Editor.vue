@@ -351,6 +351,8 @@ const shortcuts = useCanvasShortcuts(fabricCanvas, {
   undo: () => undo(),
   redo: () => redo(),
   save: () => handleSave(),
+  prevZone: () => navigateToPrevZone(),
+  nextZone: () => navigateToNextZone(),
 })
 
 const alignGuides = useAlignmentGuides(fabricCanvas, LOGICAL_WIDTH, LOGICAL_HEIGHT)
@@ -447,8 +449,19 @@ async function handleZoneSwitchInternal(from: ZoneDetail | null, to: ZoneDetail)
     canvas.requestRenderAll()
   }
 
+  history.switchZone(to.zoneCode)
   history.reset()
   transitioning.value = false
+}
+
+function navigateToPrevZone() {
+  const idx = zones.value.findIndex(z => z.id === currentZone.value?.id)
+  if (idx > 0) handleZoneSwitch(zones.value[idx - 1])
+}
+
+function navigateToNextZone() {
+  const idx = zones.value.findIndex(z => z.id === currentZone.value?.id)
+  if (idx >= 0 && idx < zones.value.length - 1) handleZoneSwitch(zones.value[idx + 1])
 }
 
 function handleAddZone() {
