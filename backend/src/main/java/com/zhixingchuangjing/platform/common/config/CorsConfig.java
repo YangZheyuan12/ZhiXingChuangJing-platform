@@ -4,8 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -13,8 +13,14 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
+    /**
+     * 暴露 {@link CorsConfigurationSource} Bean，使 Spring Security 6 的
+     * {@code http.cors(Customizer.withDefaults())} 能自动接入；同时保留 Spring MVC
+     * 对静态资源的 CORS 处理。
+     */
     @Bean
-    public CorsFilter corsFilter(@Value("${app.cors.allowed-origins}") String allowedOrigins) {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins}") String allowedOrigins) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowCredentials(true);
         configuration.setAllowedOrigins(parseOrigins(allowedOrigins));
@@ -24,7 +30,7 @@ public class CorsConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-        return new CorsFilter(source);
+        return source;
     }
 
     private List<String> parseOrigins(String allowedOrigins) {
