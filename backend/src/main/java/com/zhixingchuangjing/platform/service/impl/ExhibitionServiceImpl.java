@@ -3,6 +3,7 @@ package com.zhixingchuangjing.platform.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zhixingchuangjing.platform.common.api.PageResponse;
 import com.zhixingchuangjing.platform.common.exception.BusinessException;
 import com.zhixingchuangjing.platform.common.util.PageUtils;
@@ -401,9 +402,34 @@ public class ExhibitionServiceImpl implements ExhibitionService {
         return elementsNode.isArray() ? elementsNode.size() : 0;
     }
 
+    /**
+     * 版本快照协议版本号。
+     * <ul>
+     *   <li>v1（隐式，version 字段缺失）：前端直接发送 {@code {elements, canvasConfig, ...}}。</li>
+     *   <li>v2（显式 version=2）：服务端在写入时统一注入 {@code version} 与 {@code savedAt} 元字段，
+     *       原前端 payload 字段平铺保留，向后兼容。后续 schema 升级（例如 zones 完整快照）走 v3+。</li>
+     * </ul>
+     */
+    private static final int VERSION_DATA_FORMAT = 2;
+
     private String writeVersionData(Object versionData) {
         try {
-            return objectMapper.writeValueAsString(versionData);
+            JsonNode root = objectMapper.valueToTree(versionData);
+            ObjectNode out;
+            if (root.isObject()) {
+                out = ((ObjectNode) root).deepCopy();
+            } else {
+                out = objectMapper.createObjectNode();
+                out.set("payload", root);
+            }
+            // 注入 schema 元字段；如果前端已显式指定（如未来 v3 客户端），保留前端值。
+            if (!out.has("version")) {
+                out.put("version", VERSION_DATA_FORMAT);
+            }
+            if (!out.has("savedAt")) {
+                out.put("savedAt", LocalDateTime.now().toString());
+            }
+            return objectMapper.writeValueAsString(out);
         } catch (IOException ex) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, 40042, "版本数据格式不合法");
         }
