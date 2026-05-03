@@ -715,6 +715,26 @@ export interface UpdateExhibitRequest {
   knowledgePoints?: string[] | null
 }
 
+export interface UpsertNarrationRequest {
+  id?: number | null
+  narrationType?: string | null
+  content: string
+  audioUrl?: string | null
+  voiceType?: string | null
+  durationSeconds?: number | null
+  sortOrder?: number | null
+}
+
+export interface UpsertInteractionRequest {
+  id?: number | null
+  interactionType: string
+  questionText: string
+  optionsJson?: Record<string, unknown> | null
+  correctAnswer?: string | null
+  explanation?: string | null
+  sortOrder?: number | null
+}
+
 // ═══ 热点 (Hotspot) ═══
 
 export interface HotspotDetail {

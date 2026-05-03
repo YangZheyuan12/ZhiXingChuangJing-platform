@@ -185,6 +185,7 @@
           <ExhibitPropertiesPanel
             :exhibit="selectedExhibit"
             @update="handleExhibitPropUpdate"
+            @ai-narration="handleAiNarration"
           />
         </template>
 
@@ -232,6 +233,7 @@ import { Canvas, Rect, Textbox, FabricImage, Group, type FabricObject } from 'fa
 import { publishExhibition } from '@/api/modules/exhibitions'
 import { getEditorBundle, saveEditorBundle } from '@/api/modules/editor-bundle'
 import { submitTaskWork } from '@/api/modules/tasks'
+import { getExhibit, upsertExhibitNarration } from '@/api/modules/exhibits'
 import type {
   Asset,
   EditorBundleResponse,
@@ -516,6 +518,27 @@ function handleZonePropUpdate(field: string, value: unknown) {
 function handleExhibitPropUpdate(field: string, value: unknown) {
   if (!selectedExhibit.value) return
   em.updateExhibit(selectedExhibit.value.id, { [field]: value } as Partial<ExhibitDetail>)
+}
+
+async function handleAiNarration(narration: string, _suggestions: string[]) {
+  const current = selectedExhibit.value
+  if (!current) {
+    appStore.showToast('未选中展品，无法保存讲解词', 'error')
+    return
+  }
+  try {
+    await upsertExhibitNarration(exhibitionId, current.id, {
+      content: narration,
+      narrationType: 'ai',
+      sortOrder: current.narrations.length,
+    })
+    const refreshed = await getExhibit(exhibitionId, current.id)
+    em.updateExhibit(current.id, { narrations: refreshed.narrations })
+    appStore.showToast('AI 讲解词已保存', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, 'AI 讲解词保存失败'), 'error')
+  }
+  void _suggestions
 }
 
 // ═══════════════════════════════════════════════════════════

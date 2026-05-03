@@ -4,6 +4,8 @@ import type {
   ExhibitDetail,
   ExhibitSummary,
   UpdateExhibitRequest,
+  UpsertNarrationRequest,
+  UpsertInteractionRequest,
 } from '@/api/types'
 
 export function listExhibits(exhibitionId: number, zoneId?: number) {
@@ -25,4 +27,34 @@ export function updateExhibit(exhibitionId: number, exhibitId: number, payload: 
 
 export function deleteExhibit(exhibitionId: number, exhibitId: number) {
   return http.delete<void>(`/exhibitions/${exhibitionId}/exhibits/${exhibitId}`)
+}
+
+export function upsertExhibitNarration(
+  exhibitionId: number,
+  exhibitId: number,
+  payload: UpsertNarrationRequest,
+) {
+  return http.put<{ id: number }>(
+    `/exhibitions/${exhibitionId}/exhibits/${exhibitId}/narrations`,
+    payload,
+  )
+}
+
+export function deleteExhibitNarration(exhibitionId: number, narrationId: number) {
+  return http.delete<void>(`/exhibitions/${exhibitionId}/narrations/${narrationId}`)
+}
+
+export function upsertExhibitInteraction(
+  exhibitionId: number,
+  exhibitId: number,
+  payload: UpsertInteractionRequest,
+) {
+  return http.put<{ id: number }>(
+    `/exhibitions/${exhibitionId}/exhibits/${exhibitId}/interactions`,
+    payload,
+  )
+}
+
+export function deleteExhibitInteraction(exhibitionId: number, interactionId: number) {
+  return http.delete<void>(`/exhibitions/${exhibitionId}/interactions/${interactionId}`)
 }

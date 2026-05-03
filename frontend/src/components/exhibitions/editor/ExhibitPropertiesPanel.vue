@@ -67,12 +67,33 @@
     <div>
       <div class="mb-2 flex items-center justify-between">
         <span class="text-xs font-medium text-gray-600">讲解词 ({{ exhibit.narrations.length }})</span>
-        <button type="button" class="text-xs text-red-700 hover:underline" @click="$emit('add-narration')">+ 添加</button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs text-brand-700 transition hover:bg-brand-100"
+            title="用 AI 快速生成讲解词"
+            @click="aiModalVisible = true"
+          >
+            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 3.5a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 3.5zM10 14.25a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5a.75.75 0 01.75-.75zM3.5 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 013.5 10zM14.25 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75zM5.404 5.404a.75.75 0 011.06 0l1.06 1.061a.75.75 0 11-1.06 1.06l-1.06-1.06a.75.75 0 010-1.061zM12.475 12.475a.75.75 0 011.06 0l1.061 1.06a.75.75 0 11-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM14.596 5.404a.75.75 0 010 1.06l-1.06 1.06a.75.75 0 11-1.061-1.06l1.06-1.06a.75.75 0 011.061 0zM7.525 12.475a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.06-1.06l1.06-1.061a.75.75 0 011.06 0z" />
+            </svg>
+            AI 生成
+          </button>
+          <button type="button" class="text-xs text-red-700 hover:underline" @click="$emit('add-narration')">+ 添加</button>
+        </div>
       </div>
       <div v-for="n in exhibit.narrations" :key="n.id" class="mb-1 rounded border border-gray-100 bg-gray-50 px-2 py-1.5 text-xs text-gray-600">
         <span class="font-medium">{{ n.narrationType }}</span>: {{ n.content.slice(0, 60) }}{{ n.content.length > 60 ? '...' : '' }}
       </div>
     </div>
+
+    <NarrationGeneratorModal
+      :visible="aiModalVisible"
+      :initial-title="exhibit.title"
+      :initial-description="exhibit.description ?? ''"
+      @close="aiModalVisible = false"
+      @use="handleUseAiNarration"
+    />
 
     <div>
       <div class="mb-2 flex items-center justify-between">
@@ -90,7 +111,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { ExhibitDetail } from '@/api/types'
+import NarrationGeneratorModal from './NarrationGeneratorModal.vue'
 
 defineProps<{
   exhibit: ExhibitDetail | null
@@ -100,9 +123,16 @@ const emit = defineEmits<{
   update: [field: string, value: unknown]
   'add-narration': []
   'add-interaction': []
+  'ai-narration': [narration: string, suggestions: string[]]
 }>()
+
+const aiModalVisible = ref(false)
 
 function emitUpdate(field: string, value: unknown) {
   emit('update', field, value)
+}
+
+function handleUseAiNarration(narration: string, suggestions: string[]) {
+  emit('ai-narration', narration, suggestions)
 }
 </script>
