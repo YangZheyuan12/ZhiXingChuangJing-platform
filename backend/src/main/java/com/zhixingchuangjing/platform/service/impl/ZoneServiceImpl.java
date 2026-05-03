@@ -10,6 +10,7 @@ import com.zhixingchuangjing.platform.repository.ZoneQueryRepository;
 import com.zhixingchuangjing.platform.service.ZoneService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -94,6 +95,7 @@ public class ZoneServiceImpl implements ZoneService {
     }
 
     @Override
+    @Transactional
     public void deleteZone(Long zoneId, Long userId, String role) {
         Long exhibitionId = requireZoneExhibitionId(zoneId);
         assertCanEdit(exhibitionId, userId, role);

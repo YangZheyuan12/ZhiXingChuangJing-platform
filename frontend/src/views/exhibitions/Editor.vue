@@ -50,6 +50,24 @@
       @submit="handleSubmitForReview"
     />
 
+    <CreateZoneDialog
+      :visible="showCreateZoneDialog"
+      :submitting="creatingZone"
+      :next-sort-order="zones.length"
+      @close="showCreateZoneDialog = false"
+      @submit="handleCreateZoneSubmit"
+    />
+
+    <CreateExhibitDialog
+      :visible="showCreateExhibitDialog"
+      :submitting="creatingExhibit"
+      :zone-id="currentZone?.id ?? null"
+      :zone-title="currentZone?.title ?? ''"
+      :available-slots="zoneSlots"
+      @close="showCreateExhibitDialog = false"
+      @submit="handleCreateExhibitSubmit"
+    />
+
     <div class="flex min-h-0 flex-1 overflow-hidden">
       <!-- ═══ 左侧栏 ═══ -->
       <aside class="flex w-60 shrink-0 flex-col border-r border-gray-200 bg-white">
@@ -74,14 +92,15 @@
               :current-zone-id="currentZone?.id ?? null"
               :switching="switching"
               @switch="handleZoneSwitch"
-              @add="handleAddZone"
+              @add="openCreateZoneDialog"
+              @delete="handleDeleteZone"
             />
             <div class="mt-4 border-t border-gray-100 pt-4">
               <ExhibitList
                 :exhibits="zoneExhibits"
                 :selected-exhibit-id="selectedExhibitId"
                 @select="selectExhibit"
-                @add="handleAddExhibit"
+                @add="openCreateExhibitDialog"
                 @delete="handleDeleteExhibit"
               />
             </div>
@@ -155,7 +174,7 @@
           :zones="zones"
           :current-zone-id="currentZone?.id ?? null"
           @switch="handleZoneSwitch"
-          @add="handleAddZone"
+          @add="openCreateZoneDialog"
         />
       </main>
 
@@ -233,9 +252,17 @@ import { Canvas, Rect, Textbox, FabricImage, Group, type FabricObject } from 'fa
 import { publishExhibition } from '@/api/modules/exhibitions'
 import { getEditorBundle, saveEditorBundle } from '@/api/modules/editor-bundle'
 import { submitTaskWork } from '@/api/modules/tasks'
-import { getExhibit, upsertExhibitNarration } from '@/api/modules/exhibits'
+import { createZone, deleteZone as deleteZoneApi, getZone } from '@/api/modules/zones'
+import {
+  createExhibit as createExhibitApi,
+  deleteExhibit as deleteExhibitApi,
+  getExhibit,
+  upsertExhibitNarration,
+} from '@/api/modules/exhibits'
 import type {
   Asset,
+  CreateExhibitRequest,
+  CreateZoneRequest,
   EditorBundleResponse,
   ExhibitDetail,
   HotspotDetail,
@@ -263,6 +290,8 @@ import ZoneStrip from '@/components/exhibitions/editor/ZoneStrip.vue'
 import ZonePropertiesPanel from '@/components/exhibitions/editor/ZonePropertiesPanel.vue'
 import ExhibitPropertiesPanel from '@/components/exhibitions/editor/ExhibitPropertiesPanel.vue'
 import SubmitForReviewDialog from '@/components/exhibitions/editor/SubmitForReviewDialog.vue'
+import CreateZoneDialog from '@/components/exhibitions/editor/CreateZoneDialog.vue'
+import CreateExhibitDialog from '@/components/exhibitions/editor/CreateExhibitDialog.vue'
 
 // ─── 常量 ───
 const LOGICAL_WIDTH = 1920
@@ -288,6 +317,12 @@ const currentZoom = ref(1)
 // ─── 提交审核 ───
 const showSubmitDialog = ref(false)
 const submittingForReview = ref(false)
+
+// ─── 展区/展品 CRUD 对话框 ───
+const showCreateZoneDialog = ref(false)
+const creatingZone = ref(false)
+const showCreateExhibitDialog = ref(false)
+const creatingExhibit = ref(false)
 
 // ─── 展区切换时保存画布数据的缓存 ───
 const canvasDataCache = new Map<number, Record<string, unknown>>()
@@ -489,20 +524,91 @@ function navigateToNextZone() {
   if (idx >= 0 && idx < zones.value.length - 1) handleZoneSwitch(zones.value[idx + 1])
 }
 
-function handleAddZone() {
-  appStore.showToast('添加展区功能将在后续版本中实现', 'info')
+function openCreateZoneDialog() {
+  showCreateZoneDialog.value = true
+}
+
+async function handleCreateZoneSubmit(payload: CreateZoneRequest) {
+  if (creatingZone.value) return
+  creatingZone.value = true
+  try {
+    const { id } = await createZone(exhibitionId, payload)
+    const detail = await getZone(exhibitionId, id)
+    zm.addZoneToList(detail)
+    showCreateZoneDialog.value = false
+    appStore.showToast(`展区「${detail.title}」已创建`, 'success')
+    await handleZoneSwitch(detail)
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '创建展区失败'), 'error')
+  } finally {
+    creatingZone.value = false
+  }
+}
+
+async function handleDeleteZone(zoneId: number) {
+  const zone = zones.value.find(z => z.id === zoneId)
+  if (!zone) return
+  if (zones.value.length <= 1) {
+    appStore.showToast('至少保留一个展区', 'error')
+    return
+  }
+  const exhibitCount = allExhibits.value.filter(e => e.zoneId === zoneId).length
+  const confirmMsg = exhibitCount > 0
+    ? `删除展区「${zone.title}」将同时删除其下 ${exhibitCount} 个展品，确认继续？`
+    : `确认删除展区「${zone.title}」？`
+  if (!window.confirm(confirmMsg)) return
+  try {
+    await deleteZoneApi(exhibitionId, zoneId)
+    // 移除本地展品
+    allExhibits.value = allExhibits.value.filter(e => e.zoneId !== zoneId)
+    zm.removeZoneFromList(zoneId)
+    canvasDataCache.delete(zoneId)
+    appStore.showToast('展区已删除', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '删除展区失败'), 'error')
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
 //  展品操作
 // ═══════════════════════════════════════════════════════════
 
-function handleAddExhibit() {
-  appStore.showToast('添加展品功能将在后续版本中实现', 'info')
+function openCreateExhibitDialog() {
+  if (!currentZone.value) {
+    appStore.showToast('请先选择一个展区', 'info')
+    return
+  }
+  showCreateExhibitDialog.value = true
 }
 
-function handleDeleteExhibit(id: number) {
-  em.removeExhibit(id)
+async function handleCreateExhibitSubmit(payload: CreateExhibitRequest) {
+  if (creatingExhibit.value) return
+  creatingExhibit.value = true
+  try {
+    const { id } = await createExhibitApi(exhibitionId, payload)
+    const detail = await getExhibit(exhibitionId, id)
+    em.addExhibit(detail)
+    em.selectExhibit(detail.id)
+    showCreateExhibitDialog.value = false
+    appStore.showToast(`展品「${detail.title}」已创建`, 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '创建展品失败'), 'error')
+  } finally {
+    creatingExhibit.value = false
+  }
+}
+
+async function handleDeleteExhibit(id: number) {
+  const exhibit = allExhibits.value.find(e => e.id === id)
+  if (!exhibit) return
+  if (!window.confirm(`确认删除展品「${exhibit.title}」？`)) return
+  try {
+    await deleteExhibitApi(exhibitionId, id)
+    em.removeExhibit(id)
+    appStore.showToast('展品已删除', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '删除展品失败'), 'error')
+  }
 }
 
 // ─── 展区/展品属性更新 ───

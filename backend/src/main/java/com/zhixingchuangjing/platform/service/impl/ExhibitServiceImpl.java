@@ -11,6 +11,7 @@ import com.zhixingchuangjing.platform.repository.ZoneQueryRepository;
 import com.zhixingchuangjing.platform.service.ExhibitService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -88,6 +89,7 @@ public class ExhibitServiceImpl implements ExhibitService {
     }
 
     @Override
+    @Transactional
     public void deleteExhibit(Long exhibitId, Long userId, String role) {
         Long exhibitionId = requireExhibitExhibitionId(exhibitId);
         assertCanEdit(exhibitionId, userId, role);

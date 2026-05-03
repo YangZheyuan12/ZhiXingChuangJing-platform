@@ -99,6 +99,14 @@ public class ZoneCommandRepository {
     }
 
     public void deleteZone(Long zoneId) {
+        // 级联删除展品及其从属讲解词和互动题
+        jdbcTemplate.update(
+                "DELETE FROM exhibit_interactions WHERE exhibit_id IN (SELECT id FROM exhibition_exhibits WHERE zone_id = ?)",
+                zoneId);
+        jdbcTemplate.update(
+                "DELETE FROM exhibit_narrations WHERE exhibit_id IN (SELECT id FROM exhibition_exhibits WHERE zone_id = ?)",
+                zoneId);
+        jdbcTemplate.update("DELETE FROM exhibition_exhibits WHERE zone_id = ?", zoneId);
         jdbcTemplate.update("DELETE FROM zone_hotspots WHERE zone_id = ?", zoneId);
         jdbcTemplate.update("DELETE FROM exhibition_zones WHERE id = ?", zoneId);
     }

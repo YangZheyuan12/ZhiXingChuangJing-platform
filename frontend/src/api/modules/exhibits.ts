@@ -18,7 +18,7 @@ export function getExhibit(exhibitionId: number, exhibitId: number) {
 }
 
 export function createExhibit(exhibitionId: number, payload: CreateExhibitRequest) {
-  return http.post<ExhibitDetail>(`/exhibitions/${exhibitionId}/exhibits`, payload)
+  return http.post<{ id: number }>(`/exhibitions/${exhibitionId}/exhibits`, payload)
 }
 
 export function updateExhibit(exhibitionId: number, exhibitId: number, payload: UpdateExhibitRequest) {

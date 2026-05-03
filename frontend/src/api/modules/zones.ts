@@ -10,7 +10,7 @@ export function getZone(exhibitionId: number, zoneId: number) {
 }
 
 export function createZone(exhibitionId: number, payload: CreateZoneRequest) {
-  return http.post<ZoneDetail>(`/exhibitions/${exhibitionId}/zones`, payload)
+  return http.post<{ id: number }>(`/exhibitions/${exhibitionId}/zones`, payload)
 }
 
 export function updateZone(exhibitionId: number, zoneId: number, payload: UpdateZoneRequest) {
