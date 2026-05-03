@@ -18,9 +18,54 @@
         <h1 class="text-base font-semibold text-gray-900">{{ bundle?.exhibition.title || '展厅浏览' }}</h1>
         <span v-if="currentZone" class="rounded bg-brand-50 px-2 py-0.5 text-xs text-brand-700">{{ currentZone.title }}</span>
       </div>
-      <div class="flex items-center gap-4 text-sm text-gray-500">
-        <span v-if="bundle?.exhibition.groupName">{{ bundle.exhibition.groupName }}</span>
-        <span>{{ bundle?.exhibition.ownerName }}</span>
+      <div class="flex items-center gap-3">
+        <!-- 社交互动按钮组（仅公开展厅可见） -->
+        <div v-if="showSocialActions" class="flex items-center gap-1.5">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition"
+            :class="liked ? 'border-rose-300 bg-rose-50 text-rose-600' : 'border-slate-200 text-slate-600 hover:border-rose-200 hover:text-rose-600'"
+            :disabled="likePending"
+            :title="liked ? '取消点赞' : '点赞'"
+            @click="toggleLike"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 20 20" :fill="liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+              <path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" />
+            </svg>
+            <span class="tabular-nums">{{ likeCount }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition"
+            :class="favorited ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:border-amber-200 hover:text-amber-600'"
+            :disabled="favoritePending"
+            :title="favorited ? '取消收藏' : '收藏'"
+            @click="toggleFavorite"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 20 20" :fill="favorited ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+            <span class="tabular-nums">{{ favoriteCount }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition hover:border-brand-200 hover:text-brand-600"
+            title="查看评论"
+            @click="drawerVisible = true"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a9.06 9.06 0 01-2.347-.306c-.584.296-1.925.864-4.181 1.234-.2.032-.352-.176-.273-.362.354-.836.674-1.95.77-2.966C2.623 13.259 2 11.694 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd" />
+            </svg>
+            <span class="tabular-nums">{{ commentCount }}</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3 border-l border-slate-200 pl-3 text-sm text-gray-500">
+          <span v-if="bundle?.exhibition.groupName">{{ bundle.exhibition.groupName }}</span>
+          <span>{{ bundle?.exhibition.ownerName }}</span>
+        </div>
       </div>
     </header>
 
@@ -97,37 +142,15 @@
       </main>
     </div>
 
-    <!-- ═══ 评论区域 ═══ -->
-    <section v-if="viewer && (viewer.teacherReviews.length > 0 || viewer.comments.length > 0)" class="border-t border-gray-200 bg-white px-6 py-8">
-      <div class="mx-auto max-w-4xl space-y-8">
-        <div v-if="viewer.teacherReviews.length > 0">
-          <h2 class="mb-4 text-sm font-semibold uppercase tracking-widest text-gray-400">教师点评</h2>
-          <div class="space-y-3">
-            <article v-for="review in viewer.teacherReviews" :key="review.id" class="rounded-xl border border-gray-200 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <span class="font-medium text-gray-900">{{ review.reviewer?.nickname || '老师' }}</span>
-                <span class="text-xs text-gray-400">{{ review.createdAt }}</span>
-              </div>
-              <p class="mt-2 text-sm leading-6 text-gray-600">{{ review.comment }}</p>
-              <div v-if="review.score != null" class="mt-2 text-xs text-amber-600">评分：{{ review.score }}</div>
-            </article>
-          </div>
-        </div>
-
-        <div v-if="viewer.comments.length > 0">
-          <h2 class="mb-4 text-sm font-semibold uppercase tracking-widest text-gray-400">评论</h2>
-          <div class="space-y-3">
-            <article v-for="comment in viewer.comments" :key="comment.id" class="rounded-xl border border-gray-200 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <span class="font-medium text-gray-900">{{ comment.user?.nickname || '匿名' }}</span>
-                <span class="text-xs text-gray-400">{{ comment.createdAt }}</span>
-              </div>
-              <p class="mt-2 text-sm leading-6 text-gray-600">{{ comment.content }}</p>
-            </article>
-          </div>
-        </div>
-      </div>
-    </section>
+    <CommentDrawer
+      :visible="drawerVisible"
+      :comments="viewer?.comments ?? []"
+      :teacher-reviews="viewer?.teacherReviews ?? []"
+      :can-comment="!!authStore.user"
+      :submitting="commentSubmitting"
+      @close="drawerVisible = false"
+      @submit="handleCreateComment"
+    />
 
     <ExhibitDetailModal :exhibit="selectedExhibitDetail" @close="selectedExhibitDetail = null" />
     <DigitalHumanWidget :visible="!!bundle?.digitalHuman" />
@@ -140,6 +163,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { Canvas } from 'fabric'
 import { getExhibitionViewer } from '@/api/modules/exhibitions'
 import { getEditorBundle } from '@/api/modules/editor-bundle'
+import {
+  createCommunityComment,
+  favoriteCommunityExhibition,
+  likeCommunityExhibition,
+  unfavoriteCommunityExhibition,
+  unlikeCommunityExhibition,
+} from '@/api/modules/community'
 import { getErrorMessage } from '@/utils/request'
 import type {
   EditorBundleResponse,
@@ -153,18 +183,48 @@ import HotspotButtons from '@/components/exhibitions/viewer/HotspotButtons.vue'
 import ViewerNavigation from '@/components/exhibitions/viewer/ViewerNavigation.vue'
 import ExhibitDetailModal from '@/components/exhibitions/viewer/ExhibitDetailModal.vue'
 import DigitalHumanWidget from '@/components/exhibitions/viewer/DigitalHumanWidget.vue'
+import CommentDrawer from '@/components/exhibitions/viewer/CommentDrawer.vue'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 const LOGICAL_WIDTH = 1920
 const LOGICAL_HEIGHT = 1080
 
 const route = useRoute()
 const router = useRouter()
+const appStore = useAppStore()
+const authStore = useAuthStore()
 const exhibitionId = Number(route.params.exhibitionId)
 
 const loading = ref(true)
 const errorMessage = ref('')
 const bundle = ref<EditorBundleResponse | null>(null)
 const viewer = ref<ExhibitionViewerData | null>(null)
+
+// ─── 社交互动状态 ───
+const drawerVisible = ref(false)
+const liked = ref(false)
+const favorited = ref(false)
+const likePending = ref(false)
+const favoritePending = ref(false)
+const commentSubmitting = ref(false)
+
+const showSocialActions = computed(
+  () => !!viewer.value && bundle.value?.exhibition.visibility === 'public',
+)
+const likeCount = computed(() => viewer.value?.exhibition.stats?.likeCount ?? 0)
+const favoriteCount = computed(() => viewer.value?.exhibition.stats?.favoriteCount ?? 0)
+const commentCount = computed(() => viewer.value?.exhibition.stats?.commentCount ?? 0)
+
+function buildInteractionKey(type: 'like' | 'favorite') {
+  return `zxcyj-viewer-${type}-${authStore.user?.id || 'guest'}-${exhibitionId}`
+}
+function readInteractionState(type: 'like' | 'favorite') {
+  return localStorage.getItem(buildInteractionKey(type)) === '1'
+}
+function writeInteractionState(type: 'like' | 'favorite', value: boolean) {
+  localStorage.setItem(buildInteractionKey(type), value ? '1' : '0')
+}
 
 // ─── 展区管理 ───
 const zones = computed<ZoneDetail[]>(() => bundle.value?.zones ?? [])
@@ -218,10 +278,111 @@ async function loadData() {
     ])
     bundle.value = bundleData
     viewer.value = viewerData
+    liked.value = readInteractionState('like')
+    favorited.value = readInteractionState('favorite')
   } catch (e) {
     errorMessage.value = getErrorMessage(e, '展厅加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  社交互动
+// ═══════════════════════════════════════════════════════════
+
+async function toggleLike() {
+  if (likePending.value || !viewer.value) return
+  if (!authStore.user) {
+    appStore.showToast('请先登录后再点赞', 'info')
+    return
+  }
+  const nextLiked = !liked.value
+  liked.value = nextLiked
+  writeInteractionState('like', nextLiked)
+  // 乐观更新计数
+  if (viewer.value.exhibition.stats) {
+    viewer.value.exhibition.stats.likeCount = Math.max(
+      0,
+      viewer.value.exhibition.stats.likeCount + (nextLiked ? 1 : -1),
+    )
+  }
+  likePending.value = true
+  try {
+    if (nextLiked) {
+      await likeCommunityExhibition(exhibitionId)
+    } else {
+      await unlikeCommunityExhibition(exhibitionId)
+    }
+  } catch (error) {
+    // 回滚
+    liked.value = !nextLiked
+    writeInteractionState('like', liked.value)
+    if (viewer.value.exhibition.stats) {
+      viewer.value.exhibition.stats.likeCount = Math.max(
+        0,
+        viewer.value.exhibition.stats.likeCount + (nextLiked ? -1 : 1),
+      )
+    }
+    appStore.showToast(getErrorMessage(error, '点赞失败'), 'error')
+  } finally {
+    likePending.value = false
+  }
+}
+
+async function toggleFavorite() {
+  if (favoritePending.value || !viewer.value) return
+  if (!authStore.user) {
+    appStore.showToast('请先登录后再收藏', 'info')
+    return
+  }
+  const nextFavorited = !favorited.value
+  favorited.value = nextFavorited
+  writeInteractionState('favorite', nextFavorited)
+  if (viewer.value.exhibition.stats) {
+    viewer.value.exhibition.stats.favoriteCount = Math.max(
+      0,
+      viewer.value.exhibition.stats.favoriteCount + (nextFavorited ? 1 : -1),
+    )
+  }
+  favoritePending.value = true
+  try {
+    if (nextFavorited) {
+      await favoriteCommunityExhibition(exhibitionId)
+    } else {
+      await unfavoriteCommunityExhibition(exhibitionId)
+    }
+  } catch (error) {
+    favorited.value = !nextFavorited
+    writeInteractionState('favorite', favorited.value)
+    if (viewer.value.exhibition.stats) {
+      viewer.value.exhibition.stats.favoriteCount = Math.max(
+        0,
+        viewer.value.exhibition.stats.favoriteCount + (nextFavorited ? -1 : 1),
+      )
+    }
+    appStore.showToast(getErrorMessage(error, '收藏失败'), 'error')
+  } finally {
+    favoritePending.value = false
+  }
+}
+
+async function handleCreateComment(content: string) {
+  if (commentSubmitting.value) return
+  commentSubmitting.value = true
+  try {
+    const created = await createCommunityComment(exhibitionId, { content })
+    if (viewer.value) {
+      viewer.value.comments = [...viewer.value.comments, created]
+      if (viewer.value.exhibition.stats) {
+        viewer.value.exhibition.stats.commentCount += 1
+      }
+    }
+    appStore.showToast('评论已发布', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '评论发布失败'), 'error')
+  } finally {
+    commentSubmitting.value = false
   }
 }
 
