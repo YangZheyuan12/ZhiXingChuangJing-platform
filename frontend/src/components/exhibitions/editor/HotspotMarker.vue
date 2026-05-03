@@ -1,10 +1,16 @@
 <template>
   <div
-    class="absolute flex items-center justify-center rounded-full border-2 border-white/80 bg-red-700/70 text-white shadow-lg backdrop-blur-sm transition-transform hover:scale-110 cursor-pointer"
+    class="absolute flex items-center justify-center rounded-full text-white shadow-lg backdrop-blur-sm transition-transform cursor-pointer"
+    :class="[
+      selected
+        ? 'border-2 border-amber-300 bg-amber-500/80 scale-110 ring-4 ring-amber-200/50'
+        : 'border-2 border-white/80 bg-red-700/70 hover:scale-110 hover:border-amber-200',
+    ]"
     :style="positionStyle"
     :title="hotspot.label || hotspot.hotspotType"
+    @click.stop="emit('click', hotspot.id)"
   >
-    <span class="text-xs font-bold">{{ iconText }}</span>
+    <span class="text-xs font-bold pointer-events-none select-none">{{ iconText }}</span>
   </div>
 </template>
 
@@ -17,6 +23,11 @@ const props = defineProps<{
   zoom: number
   stageWidth: number
   stageHeight: number
+  selected?: boolean
+}>()
+
+const emit = defineEmits<{
+  click: [id: number]
 }>()
 
 const positionStyle = computed(() => {

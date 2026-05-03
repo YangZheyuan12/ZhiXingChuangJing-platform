@@ -19,6 +19,8 @@
       class="z-30"
       :hotspots="hotspots"
       :zoom="zoom"
+      :selected-id="selectedHotspotId"
+      @select="emit('hotspot-select', $event)"
     />
   </div>
 </template>
@@ -38,6 +40,11 @@ const props = defineProps<{
   zoom: number
   transitioning: boolean
   activeSlotCode?: string | null
+  selectedHotspotId?: number | null
+}>()
+
+const emit = defineEmits<{
+  'hotspot-select': [id: number]
 }>()
 
 const stageWrapper = ref<HTMLElement | null>(null)

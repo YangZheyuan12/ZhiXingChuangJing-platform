@@ -167,6 +167,8 @@
             :zoom="currentZoom"
             :transitioning="transitioning"
             :active-slot-code="selectedExhibit?.slotCode ?? null"
+            :selected-hotspot-id="selectedHotspotId"
+            @hotspot-select="handleHotspotClick"
           />
         </div>
 
@@ -205,6 +207,17 @@
             :exhibit="selectedExhibit"
             @update="handleExhibitPropUpdate"
             @ai-narration="handleAiNarration"
+          />
+        </template>
+
+        <template v-else-if="activeRightTab === 'hotspot'">
+          <HotspotPropertiesPanel
+            :hotspot="selectedHotspot"
+            :available-zones="zones"
+            @update="handleHotspotPropUpdate"
+            @delete="handleHotspotDelete"
+            @deselect="selectedHotspotId = null"
+            @create="handleHotspotCreate"
           />
         </template>
 
@@ -259,6 +272,11 @@ import {
   getExhibit,
   upsertExhibitNarration,
 } from '@/api/modules/exhibits'
+import {
+  createHotspot as createHotspotApi,
+  updateHotspot as updateHotspotApi,
+  deleteHotspot as deleteHotspotApi,
+} from '@/api/modules/hotspots'
 import type {
   Asset,
   CreateExhibitRequest,
@@ -289,6 +307,7 @@ import EditorCanvas from '@/components/exhibitions/editor/EditorCanvas.vue'
 import ZoneStrip from '@/components/exhibitions/editor/ZoneStrip.vue'
 import ZonePropertiesPanel from '@/components/exhibitions/editor/ZonePropertiesPanel.vue'
 import ExhibitPropertiesPanel from '@/components/exhibitions/editor/ExhibitPropertiesPanel.vue'
+import HotspotPropertiesPanel from '@/components/exhibitions/editor/HotspotPropertiesPanel.vue'
 import SubmitForReviewDialog from '@/components/exhibitions/editor/SubmitForReviewDialog.vue'
 import CreateZoneDialog from '@/components/exhibitions/editor/CreateZoneDialog.vue'
 import CreateExhibitDialog from '@/components/exhibitions/editor/CreateExhibitDialog.vue'
@@ -341,9 +360,19 @@ const activeLeftTab = ref<'zones' | 'components' | 'assets' | 'layers' | 'templa
 const rightTabs = [
   { label: '展区', value: 'zone' as const },
   { label: '展品', value: 'exhibit' as const },
+  { label: '热点', value: 'hotspot' as const },
   { label: '元素', value: 'element' as const },
 ]
-const activeRightTab = ref<'zone' | 'exhibit' | 'element'>('zone')
+const activeRightTab = ref<'zone' | 'exhibit' | 'hotspot' | 'element'>('zone')
+
+// ─── 热点选中状态 ───
+const selectedHotspotId = ref<number | null>(null)
+const selectedHotspot = computed<HotspotDetail | null>(() =>
+  selectedHotspotId.value
+    ? allHotspots.value.find(h => h.id === selectedHotspotId.value) ?? null
+    : null,
+)
+const hotspotBusy = ref(false)
 
 // ─── 画布 ───
 const canvasWrapper = ref<HTMLElement | null>(null)
@@ -353,7 +382,11 @@ let resizeObserver: ResizeObserver | null = null
 
 // ─── 三层渲染的 reactive 状态 ───
 const currentBackgroundUrl = ref<string | null>(null)
-const currentHotspots = ref<HotspotDetail[]>([])
+const currentHotspots = computed<HotspotDetail[]>(() =>
+  currentZone.value
+    ? allHotspots.value.filter(h => h.zoneId === currentZone.value!.id)
+    : [],
+)
 const transitioning = ref(false)
 
 // ─── 选中元素属性 ───
@@ -495,7 +528,7 @@ async function handleZoneSwitchInternal(from: ZoneDetail | null, to: ZoneDetail)
   }
 
   currentBackgroundUrl.value = to.backgroundUrl ?? null
-  currentHotspots.value = allHotspots.value.filter(h => h.zoneId === to.id)
+  // currentHotspots is computed; updates automatically when allHotspots/currentZone change
 
   await new Promise(r => setTimeout(r, 200))
 
@@ -645,6 +678,92 @@ async function handleAiNarration(narration: string, _suggestions: string[]) {
     appStore.showToast(getErrorMessage(error, 'AI 讲解词保存失败'), 'error')
   }
   void _suggestions
+}
+
+// ═══════════════════════════════════════════════════════════
+//  热点操作（CRUD）
+// ═══════════════════════════════════════════════════════════
+
+function handleHotspotClick(id: number) {
+  selectedHotspotId.value = id
+  activeRightTab.value = 'hotspot'
+}
+
+async function handleHotspotCreate() {
+  const zone = currentZone.value
+  if (!zone) {
+    appStore.showToast('请先选择一个展区', 'info')
+    return
+  }
+  if (hotspotBusy.value) return
+  hotspotBusy.value = true
+  try {
+    const existingCount = currentHotspots.value.length
+    const created = await createHotspotApi(exhibitionId, zone.id, {
+      hotspotType: 'info',
+      label: '新热点',
+      icon: 'i',
+      xPercent: 50,
+      yPercent: 50,
+      wPercent: 6,
+      hPercent: 6,
+      sortOrder: existingCount,
+    })
+    allHotspots.value = [...allHotspots.value, created]
+    selectedHotspotId.value = created.id
+    activeRightTab.value = 'hotspot'
+    appStore.showToast('热点已添加', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '创建热点失败'), 'error')
+  } finally {
+    hotspotBusy.value = false
+  }
+}
+
+async function handleHotspotPropUpdate(field: string, value: unknown) {
+  const current = selectedHotspot.value
+  if (!current) return
+  // 乐观更新
+  const before = { ...current }
+  allHotspots.value = allHotspots.value.map(h =>
+    h.id === current.id ? { ...h, [field]: value } : h,
+  )
+  if (hotspotBusy.value) return
+  hotspotBusy.value = true
+  try {
+    const updated = await updateHotspotApi(exhibitionId, current.id, {
+      [field]: value,
+    } as Record<string, unknown>)
+    allHotspots.value = allHotspots.value.map(h =>
+      h.id === current.id ? updated : h,
+    )
+  } catch (error) {
+    // 回滚
+    allHotspots.value = allHotspots.value.map(h =>
+      h.id === current.id ? before : h,
+    )
+    appStore.showToast(getErrorMessage(error, '更新热点失败'), 'error')
+  } finally {
+    hotspotBusy.value = false
+  }
+}
+
+async function handleHotspotDelete() {
+  const current = selectedHotspot.value
+  if (!current) return
+  if (!window.confirm(`确认删除热点「${current.label || current.hotspotType}」？`)) return
+  if (hotspotBusy.value) return
+  hotspotBusy.value = true
+  try {
+    await deleteHotspotApi(exhibitionId, current.id)
+    allHotspots.value = allHotspots.value.filter(h => h.id !== current.id)
+    selectedHotspotId.value = null
+    appStore.showToast('热点已删除', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '删除热点失败'), 'error')
+  } finally {
+    hotspotBusy.value = false
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1148,7 +1267,7 @@ async function restoreCurrentZone() {
   const zone = currentZone.value
   if (!zone) return
   currentBackgroundUrl.value = zone.backgroundUrl ?? null
-  currentHotspots.value = allHotspots.value.filter(h => h.zoneId === zone.id)
+  // currentHotspots is computed; auto-updates from allHotspots
   const canvas = fabricCanvas.value
   if (!canvas) return
   const data = canvasDataCache.get(zone.id) ?? zone.canvasData

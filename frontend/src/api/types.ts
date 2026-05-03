@@ -748,9 +748,37 @@ export interface HotspotDetail {
   yPercent: number
   wPercent: number
   hPercent: number
+  styleJson?: Record<string, unknown> | string | null
+  actionConfig?: Record<string, unknown> | string | null
+  sortOrder: number
+}
+
+export interface CreateHotspotRequest {
+  hotspotType: string
+  targetZoneId?: number | null
+  label?: string | null
+  icon?: string | null
+  xPercent: number
+  yPercent: number
+  wPercent?: number | null
+  hPercent?: number | null
   styleJson?: Record<string, unknown> | null
   actionConfig?: Record<string, unknown> | null
-  sortOrder: number
+  sortOrder?: number | null
+}
+
+export interface UpdateHotspotRequest {
+  hotspotType?: string | null
+  targetZoneId?: number | null
+  label?: string | null
+  icon?: string | null
+  xPercent?: number | null
+  yPercent?: number | null
+  wPercent?: number | null
+  hPercent?: number | null
+  styleJson?: Record<string, unknown> | null
+  actionConfig?: Record<string, unknown> | null
+  sortOrder?: number | null
 }
 
 // ═══ 模板 (Template) ═══

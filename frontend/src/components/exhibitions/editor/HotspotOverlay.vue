@@ -7,7 +7,9 @@
       :zoom="zoom"
       :stage-width="1920"
       :stage-height="1080"
+      :selected="selectedId === hs.id"
       class="pointer-events-auto"
+      @click="emit('select', $event)"
     />
   </div>
 </template>
@@ -19,5 +21,10 @@ import HotspotMarker from './HotspotMarker.vue'
 defineProps<{
   hotspots: HotspotDetail[]
   zoom: number
+  selectedId?: number | null
+}>()
+
+const emit = defineEmits<{
+  select: [id: number]
 }>()
 </script>
