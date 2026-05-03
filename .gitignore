@@ -16,3 +16,6 @@ frontend/dist/
 
 logs/
 *.log
+
+# 模板素材临时收件箱（用户 AI 生成的图先放这里，脚本会搬到 frontend/public/templates/）
+template-assets-inbox/
