@@ -23,15 +23,32 @@
 
         <div class="mx-1 h-5 w-px bg-gray-200" />
 
-        <!-- 保存 / 发布 -->
+        <!-- 保存 / 提交审核 / 发布 -->
         <button type="button" :disabled="saving || conflictDetected" class="rounded-md bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-gray-300" @click="handleSave">
           {{ saving ? '保存中...' : '保存全部' }}
+        </button>
+        <button
+          v-if="bundle?.exhibition.taskId"
+          type="button"
+          :disabled="submittingForReview || !bundle?.exhibition.latestVersionNo"
+          class="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+          :title="!bundle?.exhibition.latestVersionNo ? '请先保存一个版本再提交' : '提交审核'"
+          @click="showSubmitDialog = true"
+        >
+          {{ submittingForReview ? '提交中...' : '提交审核' }}
         </button>
         <button type="button" :disabled="publishing" class="rounded-md border border-brand-200 px-4 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50 disabled:border-gray-200 disabled:text-gray-400" @click="handlePublish">
           {{ publishing ? '发布中...' : '发布' }}
         </button>
       </div>
     </header>
+
+    <SubmitForReviewDialog
+      :visible="showSubmitDialog"
+      :submitting="submittingForReview"
+      @close="showSubmitDialog = false"
+      @submit="handleSubmitForReview"
+    />
 
     <div class="flex min-h-0 flex-1 overflow-hidden">
       <!-- ═══ 左侧栏 ═══ -->
@@ -214,6 +231,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Canvas, Rect, Textbox, FabricImage, Group, type FabricObject } from 'fabric'
 import { publishExhibition } from '@/api/modules/exhibitions'
 import { getEditorBundle, saveEditorBundle } from '@/api/modules/editor-bundle'
+import { submitTaskWork } from '@/api/modules/tasks'
 import type {
   Asset,
   EditorBundleResponse,
@@ -242,6 +260,7 @@ import EditorCanvas from '@/components/exhibitions/editor/EditorCanvas.vue'
 import ZoneStrip from '@/components/exhibitions/editor/ZoneStrip.vue'
 import ZonePropertiesPanel from '@/components/exhibitions/editor/ZonePropertiesPanel.vue'
 import ExhibitPropertiesPanel from '@/components/exhibitions/editor/ExhibitPropertiesPanel.vue'
+import SubmitForReviewDialog from '@/components/exhibitions/editor/SubmitForReviewDialog.vue'
 
 // ─── 常量 ───
 const LOGICAL_WIDTH = 1920
@@ -263,6 +282,10 @@ const saving = ref(false)
 const publishing = ref(false)
 const conflictDetected = ref(false)
 const currentZoom = ref(1)
+
+// ─── 提交审核 ───
+const showSubmitDialog = ref(false)
+const submittingForReview = ref(false)
 
 // ─── 展区切换时保存画布数据的缓存 ───
 const canvasDataCache = new Map<number, Record<string, unknown>>()
@@ -939,6 +962,33 @@ async function handlePublish() {
     appStore.showToast(getErrorMessage(error, '发布失败'), 'error')
   } finally {
     publishing.value = false
+  }
+}
+
+async function handleSubmitForReview(remark: string) {
+  const taskId = bundle.value?.exhibition.taskId
+  if (!taskId) {
+    appStore.showToast('当前展厅未关联任务，无法提交', 'error')
+    return
+  }
+  if (!bundle.value?.exhibition.latestVersionNo) {
+    appStore.showToast('请先保存一个版本再提交审核', 'error')
+    return
+  }
+  submittingForReview.value = true
+  try {
+    // 先 flush 自动保存的草稿，再调用提交（基于 latestVersionNo）
+    await autosave.flush()
+    await submitTaskWork(taskId, {
+      exhibitionId,
+      submitRemark: remark || null,
+    })
+    showSubmitDialog.value = false
+    appStore.showToast('已提交审核，等待教师评分', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '提交审核失败'), 'error')
+  } finally {
+    submittingForReview.value = false
   }
 }
 
