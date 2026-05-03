@@ -4,7 +4,8 @@
     <header class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-2.5">
       <div class="flex items-center gap-3">
         <button type="button" class="rounded-md px-3 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100" @click="router.back()">← 返回</button>
-        <h1 class="text-sm font-semibold text-gray-800">{{ detail?.title || '展厅编辑器' }}</h1>
+        <h1 class="text-sm font-semibold text-gray-800">{{ bundle?.exhibition.title || '展厅编辑器' }}</h1>
+        <span v-if="currentZone" class="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">{{ currentZone.title }}</span>
       </div>
 
       <div class="flex items-center gap-2">
@@ -13,6 +14,9 @@
         <span v-else-if="autosaveError" class="text-xs text-rose-500" :title="autosaveError">保存失败</span>
         <span v-else-if="lastAutosaveAt" class="text-xs text-gray-400">已自动保存 {{ autosaveTimeAgo }}</span>
 
+        <!-- 冲突提示 -->
+        <span v-if="conflictDetected" class="rounded bg-orange-100 px-2 py-0.5 text-xs text-orange-700">⚠ 冲突，请刷新</span>
+
         <!-- Undo / Redo -->
         <button type="button" :disabled="!canUndo" class="toolbar-btn" title="撤销 (Ctrl+Z)" @click="undo">↶</button>
         <button type="button" :disabled="!canRedo" class="toolbar-btn" title="重做 (Ctrl+Y)" @click="redo">↷</button>
@@ -20,8 +24,8 @@
         <div class="mx-1 h-5 w-px bg-gray-200" />
 
         <!-- 保存 / 发布 -->
-        <button type="button" :disabled="saving" class="rounded-md bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-gray-300" @click="handleSave">
-          {{ saving ? '保存中...' : '保存草稿' }}
+        <button type="button" :disabled="saving || conflictDetected" class="rounded-md bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-gray-300" @click="handleSave">
+          {{ saving ? '保存中...' : '保存全部' }}
         </button>
         <button type="button" :disabled="publishing" class="rounded-md border border-brand-200 px-4 py-1.5 text-sm font-medium text-brand-700 transition hover:bg-brand-50 disabled:border-gray-200 disabled:text-gray-400" @click="handlePublish">
           {{ publishing ? '发布中...' : '发布' }}
@@ -46,8 +50,28 @@
         </div>
 
         <div class="flex-1 overflow-y-auto p-3">
+          <!-- 展区列表 -->
+          <template v-if="activeLeftTab === 'zones'">
+            <ZoneNavigator
+              :zones="zones"
+              :current-zone-id="currentZone?.id ?? null"
+              :switching="switching"
+              @switch="handleZoneSwitch"
+              @add="handleAddZone"
+            />
+            <div class="mt-4 border-t border-gray-100 pt-4">
+              <ExhibitList
+                :exhibits="zoneExhibits"
+                :selected-exhibit-id="selectedExhibitId"
+                @select="selectExhibit"
+                @add="handleAddExhibit"
+                @delete="handleDeleteExhibit"
+              />
+            </div>
+          </template>
+
           <!-- 组件库 -->
-          <template v-if="activeLeftTab === 'components'">
+          <template v-else-if="activeLeftTab === 'components'">
             <div class="space-y-2">
               <button type="button" class="component-btn" @click="addTextbox">
                 <span class="text-lg">T</span>
@@ -98,75 +122,126 @@
           </div>
         </div>
         <div ref="canvasWrapper" class="flex flex-1 items-center justify-center overflow-hidden p-4">
-          <canvas ref="canvasEl" />
+          <EditorCanvas
+            ref="editorCanvasRef"
+            :background-url="currentBackgroundUrl"
+            :background-style="currentZone?.backgroundStyle ?? null"
+            :hotspots="currentHotspots"
+            :slots="zoneSlots"
+            :zoom="currentZoom"
+            :transitioning="transitioning"
+            :active-slot-code="selectedExhibit?.slotCode ?? null"
+          />
         </div>
+
+        <ZoneStrip
+          :zones="zones"
+          :current-zone-id="currentZone?.id ?? null"
+          @switch="handleZoneSwitch"
+          @add="handleAddZone"
+        />
       </main>
 
       <!-- ═══ 右侧栏：属性面板 ═══ -->
       <aside class="w-64 shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-4">
-        <h3 class="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">属性</h3>
-        <template v-if="selectedObject">
-          <div class="space-y-4">
-            <div class="space-y-3">
-              <label v-for="prop in propertyFields" :key="prop.key" class="block">
-                <span class="text-xs text-gray-500">{{ prop.label }}</span>
-                <input
-                  type="number"
-                  class="mt-1 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm focus:border-brand-400 focus:outline-none"
-                  :value="Math.round(selectedProps[prop.key])"
-                  @input="onPropInput(prop.key, $event)"
-                />
-              </label>
-            </div>
+        <div class="mb-3 flex border-b border-gray-100">
+          <button
+            v-for="tab in rightTabs"
+            :key="tab.value"
+            type="button"
+            class="flex-1 py-2 text-xs font-medium transition"
+            :class="activeRightTab === tab.value ? 'border-b-2 border-brand-600 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+            @click="activeRightTab = tab.value"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
 
-            <div v-if="isTextboxSelected" class="border-t border-gray-100 pt-4">
-              <TextStylePanel
-                :font-family="textStyle.fontFamily"
-                :font-size="textStyle.fontSize"
-                :fill="textStyle.fill"
-                :font-weight="textStyle.fontWeight"
-                :font-style="textStyle.fontStyle"
-                :underline="textStyle.underline"
-                :text-align="textStyle.textAlign"
-                @update="handleTextStyleUpdate"
-              />
-            </div>
-          </div>
+        <template v-if="activeRightTab === 'zone'">
+          <ZonePropertiesPanel
+            :zone="currentZone"
+            @update="handleZonePropUpdate"
+          />
         </template>
-        <p v-else class="text-xs text-gray-400">选中画布元素后可编辑属性。</p>
+
+        <template v-else-if="activeRightTab === 'exhibit'">
+          <ExhibitPropertiesPanel
+            :exhibit="selectedExhibit"
+            @update="handleExhibitPropUpdate"
+          />
+        </template>
+
+        <template v-else-if="activeRightTab === 'element'">
+          <h3 class="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">元素属性</h3>
+          <template v-if="selectedObject">
+            <div class="space-y-4">
+              <div class="space-y-3">
+                <label v-for="prop in propertyFields" :key="prop.key" class="block">
+                  <span class="text-xs text-gray-500">{{ prop.label }}</span>
+                  <input
+                    type="number"
+                    class="mt-1 w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm focus:border-brand-400 focus:outline-none"
+                    :value="Math.round(selectedProps[prop.key])"
+                    @input="onPropInput(prop.key, $event)"
+                  />
+                </label>
+              </div>
+
+              <div v-if="isTextboxSelected" class="border-t border-gray-100 pt-4">
+                <TextStylePanel
+                  :font-family="textStyle.fontFamily"
+                  :font-size="textStyle.fontSize"
+                  :fill="textStyle.fill"
+                  :font-weight="textStyle.fontWeight"
+                  :font-style="textStyle.fontStyle"
+                  :underline="textStyle.underline"
+                  :text-align="textStyle.textAlign"
+                  @update="handleTextStyleUpdate"
+                />
+              </div>
+            </div>
+          </template>
+          <p v-else class="text-xs text-gray-400">选中画布元素后可编辑属性。</p>
+        </template>
       </aside>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Canvas, Rect, Textbox, FabricImage, Group, type FabricObject } from 'fabric'
-import {
-  getExhibitionDetail,
-  getExhibitionVersions,
-  publishExhibition,
-  saveExhibitionVersion,
-} from '@/api/modules/exhibitions'
+import { publishExhibition } from '@/api/modules/exhibitions'
+import { getEditorBundle, saveEditorBundle } from '@/api/modules/editor-bundle'
 import type {
   Asset,
-  ExhibitionDetail,
-  ExhibitionVersion,
+  EditorBundleResponse,
+  ExhibitDetail,
+  HotspotDetail,
   MuseumResource,
-  SaveExhibitionVersionRequest,
+  SlotConfig,
+  ZoneDetail,
 } from '@/api/types'
 import { getErrorMessage } from '@/utils/request'
 import { useAppStore } from '@/stores/app'
 import { useCanvasHistory } from '@/composables/useCanvasHistory'
 import { useCanvasAutosave } from '@/composables/useCanvasAutosave'
 import { useCanvasShortcuts } from '@/composables/useCanvasShortcuts'
+import { useZoneManager } from '@/composables/useZoneManager'
+import { useExhibitManager } from '@/composables/useExhibitManager'
 import AssetPicker from '@/components/exhibitions/editor/AssetPicker.vue'
 import LayerPanel from '@/components/exhibitions/editor/LayerPanel.vue'
 import TextStylePanel from '@/components/exhibitions/editor/TextStylePanel.vue'
 import type { LayerItem } from '@/components/exhibitions/editor/LayerPanel.vue'
 import TemplatePicker from '@/components/exhibitions/editor/TemplatePicker.vue'
 import { useAlignmentGuides } from '@/composables/useAlignmentGuides'
+import ZoneNavigator from '@/components/exhibitions/editor/ZoneNavigator.vue'
+import ExhibitList from '@/components/exhibitions/editor/ExhibitList.vue'
+import EditorCanvas from '@/components/exhibitions/editor/EditorCanvas.vue'
+import ZoneStrip from '@/components/exhibitions/editor/ZoneStrip.vue'
+import ZonePropertiesPanel from '@/components/exhibitions/editor/ZonePropertiesPanel.vue'
+import ExhibitPropertiesPanel from '@/components/exhibitions/editor/ExhibitPropertiesPanel.vue'
 
 // ─── 常量 ───
 const LOGICAL_WIDTH = 1920
@@ -180,26 +255,46 @@ const appStore = useAppStore()
 const exhibitionId = Number(route.params.exhibitionId)
 
 // ─── 基础状态 ───
-const detail = ref<ExhibitionDetail | null>(null)
-const versions = ref<ExhibitionVersion[]>([])
+const bundle = ref<EditorBundleResponse | null>(null)
+const bundleRevision = ref<number | null>(null)
+const allExhibits = ref<ExhibitDetail[]>([])
+const allHotspots = ref<HotspotDetail[]>([])
 const saving = ref(false)
 const publishing = ref(false)
+const conflictDetected = ref(false)
 const currentZoom = ref(1)
+
+// ─── 展区切换时保存画布数据的缓存 ───
+const canvasDataCache = new Map<number, Record<string, unknown>>()
 
 // ─── 左侧栏 ───
 const leftTabs = [
+  { label: '展区', value: 'zones' as const },
   { label: '组件库', value: 'components' as const },
   { label: '素材库', value: 'assets' as const },
   { label: '图层', value: 'layers' as const },
   { label: '模板', value: 'templates' as const },
 ]
-const activeLeftTab = ref<'components' | 'assets' | 'layers' | 'templates'>('components')
+const activeLeftTab = ref<'zones' | 'components' | 'assets' | 'layers' | 'templates'>('zones')
+
+// ─── 右侧栏 ───
+const rightTabs = [
+  { label: '展区', value: 'zone' as const },
+  { label: '展品', value: 'exhibit' as const },
+  { label: '元素', value: 'element' as const },
+]
+const activeRightTab = ref<'zone' | 'exhibit' | 'element'>('zone')
 
 // ─── 画布 ───
-const canvasEl = ref<HTMLCanvasElement | null>(null)
 const canvasWrapper = ref<HTMLElement | null>(null)
+const editorCanvasRef = ref<InstanceType<typeof EditorCanvas> | null>(null)
 const fabricCanvas = shallowRef<Canvas | null>(null)
 let resizeObserver: ResizeObserver | null = null
+
+// ─── 三层渲染的 reactive 状态 ───
+const currentBackgroundUrl = ref<string | null>(null)
+const currentHotspots = ref<HotspotDetail[]>([])
+const transitioning = ref(false)
 
 // ─── 选中元素属性 ───
 const selectedObject = shallowRef<FabricObject | null>(null)
@@ -212,6 +307,24 @@ const propertyFields = [
   { key: 'h' as const, label: '高度' },
 ]
 
+// ─── Zone Manager ───
+const exhibitionIdRef = toRef(() => exhibitionId)
+const zm = useZoneManager({
+  exhibitionId: exhibitionIdRef,
+  onZoneSwitch: handleZoneSwitchInternal,
+})
+const { zones, currentZone, switching } = zm
+
+// ─── Exhibit Manager ───
+const em = useExhibitManager(allExhibits, currentZone as any)
+const { zoneExhibits, selectedExhibitId, selectedExhibit, selectExhibit } = em
+
+// ─── 展区插槽 ───
+const zoneSlots = computed<SlotConfig[]>(() => {
+  if (!currentZone.value?.layoutConfig?.slots) return []
+  return currentZone.value.layoutConfig.slots
+})
+
 // ─── Composables ───
 const history = useCanvasHistory(fabricCanvas)
 const { canUndo, canRedo, undo, redo } = history
@@ -219,7 +332,7 @@ const { canUndo, canRedo, undo, redo } = history
 const autosave = useCanvasAutosave(
   fabricCanvas,
   () => exhibitionId,
-  () => buildSavePayload(),
+  () => buildLegacySavePayload(),
 )
 const { lastAutosaveAt, autosaveError, autosaving } = autosave
 
@@ -244,11 +357,12 @@ const alignGuides = useAlignmentGuides(fabricCanvas, LOGICAL_WIDTH, LOGICAL_HEIG
 // ═══════════════════════════════════════════════════════════
 
 function initCanvas() {
-  if (!canvasEl.value) return
-  const canvas = new Canvas(canvasEl.value, {
+  const canvasEl = editorCanvasRef.value?.canvasEl
+  if (!canvasEl) return
+  const canvas = new Canvas(canvasEl, {
     width: LOGICAL_WIDTH,
     height: LOGICAL_HEIGHT,
-    backgroundColor: '#f7efe9',
+    backgroundColor: 'transparent',
     selection: true,
   })
   fabricCanvas.value = canvas
@@ -260,8 +374,11 @@ function initCanvas() {
   canvas.on('object:added', refreshLayers)
   canvas.on('object:removed', refreshLayers)
 
-  resizeObserver = new ResizeObserver(() => fitCanvasToContainer())
-  if (canvasWrapper.value) resizeObserver.observe(canvasWrapper.value)
+  const wrapper = editorCanvasRef.value?.stageWrapper
+  if (wrapper) {
+    resizeObserver = new ResizeObserver(() => fitCanvasToContainer())
+    resizeObserver.observe(wrapper)
+  }
 
   fitCanvasToContainer()
   history.bindCanvasEvents()
@@ -293,6 +410,76 @@ function fitCanvasToContainer() {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  展区切换
+// ═══════════════════════════════════════════════════════════
+
+function handleZoneSwitch(zone: ZoneDetail) {
+  zm.switchToZone(zone)
+}
+
+async function handleZoneSwitchInternal(from: ZoneDetail | null, to: ZoneDetail) {
+  transitioning.value = true
+  const canvas = fabricCanvas.value
+  if (from && canvas) {
+    canvasDataCache.set(from.id, (canvas as any).toJSON(CUSTOM_PROPS))
+  }
+
+  if (canvas) {
+    canvas.clear()
+    canvas.backgroundColor = 'transparent'
+  }
+
+  currentBackgroundUrl.value = to.backgroundUrl ?? null
+  currentHotspots.value = allHotspots.value.filter(h => h.zoneId === to.id)
+
+  await new Promise(r => setTimeout(r, 200))
+
+  if (canvas) {
+    const cached = canvasDataCache.get(to.id)
+    const data = cached ?? to.canvasData
+    if (data && typeof data === 'object' && 'objects' in data) {
+      await canvas.loadFromJSON(data)
+    }
+    fitCanvasToContainer()
+    canvas.requestRenderAll()
+  }
+
+  history.reset()
+  transitioning.value = false
+}
+
+function handleAddZone() {
+  appStore.showToast('添加展区功能将在后续版本中实现', 'info')
+}
+
+// ═══════════════════════════════════════════════════════════
+//  展品操作
+// ═══════════════════════════════════════════════════════════
+
+function handleAddExhibit() {
+  appStore.showToast('添加展品功能将在后续版本中实现', 'info')
+}
+
+function handleDeleteExhibit(id: number) {
+  em.removeExhibit(id)
+}
+
+// ─── 展区/展品属性更新 ───
+
+function handleZonePropUpdate(field: string, value: unknown) {
+  if (!currentZone.value) return
+  zm.updateZoneInList(currentZone.value.id, { [field]: value } as Partial<ZoneDetail>)
+  if (field === 'backgroundUrl') {
+    currentBackgroundUrl.value = (value as string) ?? null
+  }
+}
+
+function handleExhibitPropUpdate(field: string, value: unknown) {
+  if (!selectedExhibit.value) return
+  em.updateExhibit(selectedExhibit.value.id, { [field]: value } as Partial<ExhibitDetail>)
+}
+
+// ═══════════════════════════════════════════════════════════
 //  选中元素属性同步
 // ═══════════════════════════════════════════════════════════
 
@@ -306,6 +493,7 @@ function syncSelectedProps() {
   selectedProps.y = obj.top ?? 0
   selectedProps.w = (obj.width ?? 0) * (obj.scaleX ?? 1)
   selectedProps.h = (obj.height ?? 0) * (obj.scaleY ?? 1)
+  activeRightTab.value = 'element'
 }
 
 function onPropInput(key: string, e: Event) {
@@ -336,7 +524,6 @@ const layerList = computed<LayerItem[]>(() => {
   if (!canvas) return []
   const objects = canvas.getObjects().filter((o) => !(o as any).__isGuide)
   const activeObj = canvas.getActiveObject()
-  // 反序：最上层的对象显示在列表顶部（Photoshop 习惯）
   return [...objects].reverse().map((obj) => {
     const name = (obj as any).assetName || (obj as any).text?.slice(0, 20) || obj.type || 'object'
     const icon = obj.type === 'textbox' ? 'T' : obj.type === 'rect' ? '▬' : obj.type === 'group' ? '▦' : obj.type === 'image' ? '🖼' : '●'
@@ -678,52 +865,68 @@ function insertMediaPlaceholder(
 }
 
 // ═══════════════════════════════════════════════════════════
-//  保存 / 发布 / 恢复
+//  保存 / 发布 (editor-bundle with revision)
 // ═══════════════════════════════════════════════════════════
 
-function buildSavePayload(): SaveExhibitionVersionRequest {
+function buildCanvasDataMap(): Record<string, Record<string, unknown>> {
+  const canvas = fabricCanvas.value
+  const map: Record<string, Record<string, unknown>> = {}
+  if (currentZone.value && canvas) {
+    canvasDataCache.set(currentZone.value.id, (canvas as any).toJSON(CUSTOM_PROPS))
+  }
+  for (const zone of zones.value) {
+    const data = canvasDataCache.get(zone.id)
+    if (data) {
+      map[zone.zoneCode] = data
+    }
+  }
+  return map
+}
+
+function buildLegacySavePayload() {
   const canvas = fabricCanvas.value
   return {
-    saveType: 'manual',
+    saveType: 'manual' as const,
     versionNote: '',
-    canvasConfig: {
-      width: LOGICAL_WIDTH,
-      height: LOGICAL_HEIGHT,
-      background: '#f7efe9',
-      zoom: 1,
-    },
-    versionData: canvas
-      ? (canvas as any).toJSON(CUSTOM_PROPS)
-      : {},
+    canvasConfig: { width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT, background: 'transparent', zoom: 1 },
+    versionData: canvas ? (canvas as any).toJSON(CUSTOM_PROPS) : {},
   }
 }
 
 async function handleSave() {
   saving.value = true
   try {
-    const payload = buildSavePayload()
-    payload.versionNote = '手动保存'
-    const version = await saveExhibitionVersion(exhibitionId, payload)
+    const canvasDataMap = buildCanvasDataMap()
+    const result = await saveEditorBundle(exhibitionId, {
+      revision: bundleRevision.value,
+      canvasDataMap,
+    })
+    bundleRevision.value = result.revision
+    conflictDetected.value = false
     autosave.clearDirty()
-    appStore.showToast(`版本 V${version.versionNo} 已保存`, 'success')
-    await loadVersions()
-  } catch (error) {
-    appStore.showToast(getErrorMessage(error, '保存失败'), 'error')
+    appStore.showToast('保存成功', 'success')
+  } catch (error: any) {
+    if (error?.response?.status === 409) {
+      conflictDetected.value = true
+      appStore.showToast('展厅内容已被其他成员更新，请刷新后重试', 'error')
+    } else {
+      appStore.showToast(getErrorMessage(error, '保存失败'), 'error')
+    }
   } finally {
     saving.value = false
   }
 }
 
 async function handlePublish() {
-  if (!detail.value?.latestVersionNo) {
+  if (!bundle.value?.exhibition.latestVersionNo) {
     appStore.showToast('请先保存一个版本再发布', 'error')
     return
   }
   publishing.value = true
   try {
     await publishExhibition(exhibitionId, {
-      versionNo: detail.value.latestVersionNo,
-      visibility: (detail.value.visibility as 'private' | 'class' | 'public') || 'class',
+      versionNo: bundle.value.exhibition.latestVersionNo,
+      visibility: (bundle.value.exhibition.visibility as 'private' | 'class' | 'public') || 'class',
     })
     appStore.showToast('展厅已发布', 'success')
   } catch (error) {
@@ -733,63 +936,43 @@ async function handlePublish() {
   }
 }
 
-async function restoreLatestVersion() {
-  const canvas = fabricCanvas.value
-  if (!canvas || versions.value.length === 0) return
-  const latest = versions.value[0]
-  if (!latest.versionData) return
-
-  autosave.pauseAutosave()
-  try {
-    const vd = latest.versionData as Record<string, unknown>
-    const savedW = latest.canvasConfig?.width || LOGICAL_WIDTH
-    const savedH = latest.canvasConfig?.height || LOGICAL_HEIGHT
-
-    await canvas.loadFromJSON(vd)
-
-    // 旧版数据兼容：如果存储时的逻辑尺寸和当前不同，按比例缩放所有对象
-    if (savedW !== LOGICAL_WIDTH || savedH !== LOGICAL_HEIGHT) {
-      const scaleX = LOGICAL_WIDTH / savedW
-      const scaleY = LOGICAL_HEIGHT / savedH
-      canvas.getObjects().forEach((obj) => {
-        obj.set({
-          left: (obj.left ?? 0) * scaleX,
-          top: (obj.top ?? 0) * scaleY,
-          scaleX: (obj.scaleX ?? 1) * scaleX,
-          scaleY: (obj.scaleY ?? 1) * scaleY,
-        })
-        obj.setCoords()
-      })
-    }
-
-    fitCanvasToContainer()
-    canvas.requestRenderAll()
-    history.reset()
-  } catch {
-    appStore.showToast('版本恢复失败', 'error')
-  } finally {
-    autosave.resumeAutosave()
-  }
-}
-
 // ═══════════════════════════════════════════════════════════
 //  数据加载
 // ═══════════════════════════════════════════════════════════
 
-async function loadDetail() {
+async function loadBundle() {
   try {
-    detail.value = await getExhibitionDetail(exhibitionId)
-  } catch {
-    appStore.showToast('展厅信息加载失败', 'error')
+    const data = await getEditorBundle(exhibitionId)
+    bundle.value = data
+    bundleRevision.value = data.revision
+    allExhibits.value = data.exhibits
+    allHotspots.value = data.hotspots
+    zm.setZones(data.zones)
+
+    for (const zone of data.zones) {
+      if (zone.canvasData && typeof zone.canvasData === 'object' && 'objects' in zone.canvasData) {
+        canvasDataCache.set(zone.id, zone.canvasData)
+      }
+    }
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '展厅数据加载失败'), 'error')
   }
 }
 
-async function loadVersions() {
-  try {
-    versions.value = await getExhibitionVersions(exhibitionId)
-  } catch {
-    versions.value = []
+async function restoreCurrentZone() {
+  const zone = currentZone.value
+  if (!zone) return
+  currentBackgroundUrl.value = zone.backgroundUrl ?? null
+  currentHotspots.value = allHotspots.value.filter(h => h.zoneId === zone.id)
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const data = canvasDataCache.get(zone.id) ?? zone.canvasData
+  if (data && typeof data === 'object' && 'objects' in data) {
+    await canvas.loadFromJSON(data)
   }
+  fitCanvasToContainer()
+  canvas.requestRenderAll()
+  history.reset()
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -797,9 +980,9 @@ async function loadVersions() {
 // ═══════════════════════════════════════════════════════════
 
 onMounted(async () => {
-  await Promise.all([loadDetail(), loadVersions()])
+  await loadBundle()
   initCanvas()
-  await restoreLatestVersion()
+  await restoreCurrentZone()
 })
 
 function refreshLayers() {
