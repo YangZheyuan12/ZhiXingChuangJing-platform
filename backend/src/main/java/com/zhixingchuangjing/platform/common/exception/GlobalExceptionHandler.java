@@ -3,6 +3,8 @@ package com.zhixingchuangjing.platform.common.exception;
 import com.zhixingchuangjing.platform.common.api.ApiResponse;
 import com.zhixingchuangjing.platform.common.api.RequestContext;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -17,8 +19,12 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
+        log.warn("[BusinessException] code={} message={} requestId={}",
+                ex.getCode(), ex.getMessage(), RequestContext.getRequestId());
         return ResponseEntity.status(ex.getHttpStatus())
                 .body(ApiResponse.failure(ex.getCode(), ex.getMessage(), null, RequestContext.getRequestId()));
     }
@@ -54,6 +60,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception ex) {
+        log.error("[InternalServerError] requestId={} message={}",
+                RequestContext.getRequestId(), ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.failure(50000, "服务器内部错误", null, RequestContext.getRequestId()));
     }

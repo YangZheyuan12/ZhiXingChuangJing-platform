@@ -1,0 +1,200 @@
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?
+Hibernate: 
+    select
+        ue1_0.id,
+        ue1_0.account,
+        ue1_0.avatar_url,
+        ue1_0.bio,
+        ue1_0.created_at,
+        ue1_0.email,
+        ue1_0.gender,
+        ue1_0.last_login_at,
+        ue1_0.mobile,
+        ue1_0.nickname,
+        ue1_0.password_hash,
+        ue1_0.real_name,
+        ue1_0.role,
+        ue1_0.school_id,
+        ue1_0.status,
+        ue1_0.updated_at 
+    from
+        users ue1_0 
+    where
+        ue1_0.id=? 
+        and ue1_0.status=?

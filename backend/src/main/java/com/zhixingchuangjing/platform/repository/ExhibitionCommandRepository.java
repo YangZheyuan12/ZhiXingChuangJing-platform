@@ -180,6 +180,18 @@ public class ExhibitionCommandRepository {
         return jdbcTemplate.update(sql, exhibitionId, expectedRevision);
     }
 
+    /**
+     * 无乐观锁版本的 revision 自增，适用于细粒度独立资源（如热点）的修改。
+     */
+    public int incrementBundleRevision(Long exhibitionId) {
+        String sql = """
+            UPDATE exhibitions
+            SET bundle_revision = bundle_revision + 1, updated_at = NOW()
+            WHERE id = ?
+            """;
+        return jdbcTemplate.update(sql, exhibitionId);
+    }
+
     public Integer getCurrentBundleRevision(Long exhibitionId) {
         String sql = "SELECT bundle_revision FROM exhibitions WHERE id = ?";
         return jdbcTemplate.queryForObject(sql, Integer.class, exhibitionId);

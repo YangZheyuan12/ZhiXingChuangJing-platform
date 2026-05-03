@@ -544,7 +544,9 @@ public class ExhibitionServiceImpl implements ExhibitionService {
                     hotspotCommandRepository.createHotspot(
                             zoneId, targetZoneId, type,
                             null, icon,
-                            x, y, w, h, hsSortOrder++);
+                            x, y, w, h,
+                            null, null,
+                            hsSortOrder++);
                 }
             }
         } catch (IOException e) {
