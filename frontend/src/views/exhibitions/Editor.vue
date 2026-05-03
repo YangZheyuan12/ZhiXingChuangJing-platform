@@ -149,7 +149,19 @@
       <!-- ═══ 画布区 ═══ -->
       <main class="relative flex min-w-0 flex-1 flex-col bg-neutral-100">
         <div class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-1.5">
-          <span class="text-xs text-gray-400">{{ LOGICAL_WIDTH }} × {{ LOGICAL_HEIGHT }}</span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-400">{{ LOGICAL_WIDTH }} × {{ LOGICAL_HEIGHT }}</span>
+            <button
+              type="button"
+              :disabled="!currentZone || hotspotBusy"
+              class="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-300"
+              :title="!currentZone ? '请先选择展区' : '在画布中央添加一个热点'"
+              @click="handleHotspotCreate"
+            >
+              <span class="text-sm leading-none">＋</span>
+              <span>添加热点</span>
+            </button>
+          </div>
           <div class="flex items-center gap-1">
             <button type="button" class="toolbar-btn text-xs" title="缩小" @click="zoomBy(-0.1)">−</button>
             <span class="w-12 text-center text-xs text-gray-400">{{ Math.round(currentZoom * 100) }}%</span>
@@ -168,7 +180,9 @@
             :transitioning="transitioning"
             :active-slot-code="selectedExhibit?.slotCode ?? null"
             :selected-hotspot-id="selectedHotspotId"
+            :hotspot-draggable="activeRightTab === 'hotspot'"
             @hotspot-select="handleHotspotClick"
+            @hotspot-drag-end="handleHotspotDragEnd"
           />
         </div>
 
@@ -467,7 +481,10 @@ function initCanvas() {
 
   canvas.on('selection:created', syncSelectedProps)
   canvas.on('selection:updated', syncSelectedProps)
-  canvas.on('selection:cleared', () => { selectedObject.value = null })
+  canvas.on('selection:cleared', () => {
+    selectedObject.value = null
+    selectedHotspotId.value = null
+  })
   canvas.on('object:modified', syncSelectedProps)
   canvas.on('object:added', refreshLayers)
   canvas.on('object:removed', refreshLayers)
@@ -715,6 +732,32 @@ async function handleHotspotCreate() {
     appStore.showToast('热点已添加', 'success')
   } catch (error) {
     appStore.showToast(getErrorMessage(error, '创建热点失败'), 'error')
+  } finally {
+    hotspotBusy.value = false
+  }
+}
+
+async function handleHotspotDragEnd(id: number, xPercent: number, yPercent: number) {
+  const target = allHotspots.value.find(h => h.id === id)
+  if (!target) return
+  const before = { ...target }
+  // 乐观更新位置
+  allHotspots.value = allHotspots.value.map(h =>
+    h.id === id ? { ...h, xPercent, yPercent } : h,
+  )
+  selectedHotspotId.value = id
+  activeRightTab.value = 'hotspot'
+  if (hotspotBusy.value) return
+  hotspotBusy.value = true
+  try {
+    const updated = await updateHotspotApi(exhibitionId, id, {
+      xPercent,
+      yPercent,
+    })
+    allHotspots.value = allHotspots.value.map(h => (h.id === id ? updated : h))
+  } catch (error) {
+    allHotspots.value = allHotspots.value.map(h => (h.id === id ? before : h))
+    appStore.showToast(getErrorMessage(error, '更新热点位置失败'), 'error')
   } finally {
     hotspotBusy.value = false
   }

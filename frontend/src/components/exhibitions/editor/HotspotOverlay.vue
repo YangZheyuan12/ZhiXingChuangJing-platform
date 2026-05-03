@@ -8,8 +8,10 @@
       :stage-width="1920"
       :stage-height="1080"
       :selected="selectedId === hs.id"
+      :draggable="draggable"
       class="pointer-events-auto"
       @click="emit('select', $event)"
+      @drag-end="(id, x, y) => emit('dragEnd', id, x, y)"
     />
   </div>
 </template>
@@ -22,9 +24,11 @@ defineProps<{
   hotspots: HotspotDetail[]
   zoom: number
   selectedId?: number | null
+  draggable?: boolean
 }>()
 
 const emit = defineEmits<{
   select: [id: number]
+  dragEnd: [id: number, xPercent: number, yPercent: number]
 }>()
 </script>

@@ -20,7 +20,9 @@
       :hotspots="hotspots"
       :zoom="zoom"
       :selected-id="selectedHotspotId"
+      :draggable="hotspotDraggable"
       @select="emit('hotspot-select', $event)"
+      @drag-end="(id, x, y) => emit('hotspot-drag-end', id, x, y)"
     />
   </div>
 </template>
@@ -41,10 +43,12 @@ const props = defineProps<{
   transitioning: boolean
   activeSlotCode?: string | null
   selectedHotspotId?: number | null
+  hotspotDraggable?: boolean
 }>()
 
 const emit = defineEmits<{
   'hotspot-select': [id: number]
+  'hotspot-drag-end': [id: number, xPercent: number, yPercent: number]
 }>()
 
 const stageWrapper = ref<HTMLElement | null>(null)
