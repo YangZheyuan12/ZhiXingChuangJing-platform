@@ -578,10 +578,38 @@
 
 【L】后端启动报 "Port 8080 was already in use"
 ─────────────────────────────────────────────────────────────────
-原因：有旧的 Java 进程没退干净
-解决：
-    Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force
-    然后重新启动
+原因：有旧的 Java 进程没退干净。常见触发场景：
+  · 上次是用 Start-Process -WindowStyle Hidden 后台启动，没有可见窗口，
+    关 PowerShell 时 Java 进程还在继续跑
+  · 上次打包后忘了重启就直接启动新的，两个进程抢 8080
+  · 其他软件（如 Tomcat、Nacos 等）也在 8080
+
+解决方式（三选一，由精确到粗暴）：
+
+  A. 精确定位后端 PID 再杀（推荐，不误伤其他 Java 程序）
+     # 先找出谁在占 8080
+     netstat -ano | findstr :8080
+     # 输出里 LISTENING 那行最后一列就是 PID，例如：
+     #   TCP    0.0.0.0:8080    0.0.0.0:0    LISTENING    35864
+     # 然后按 PID 精确终止
+     taskkill /PID 35864 /F
+
+  B. 一键杀掉所有 Java 进程（简单，但会把 IDE 自带的 Java 一起杀掉）
+     Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force
+
+  C. 让后端换端口启动（不杀旧进程，临时测试用）
+     java '-Dfile.encoding=UTF-8' '-Dspring.profiles.active=dev' `
+          '-Dserver.port=8081' `
+          -jar target/platform-backend-0.0.1-SNAPSHOT.jar
+     注意前端默认调用 8080，改端口后前端也要一起改代理配置，
+     一般不如直接杀旧进程省事。
+
+✅ 验证端口已释放：
+     netstat -ano | findstr :8080
+   只有 TIME_WAIT / ESTABLISHED 之类短连接没问题，没有 LISTENING 就行。
+
+💡 小技巧：为了以后好管理，建议**前台启动后端**（不要用 Start-Process
+   -WindowStyle Hidden 后台跑），这样 Ctrl+C 就能干净地停掉。
 
 
 【M】上传文件 / 头像 / 视频失败
