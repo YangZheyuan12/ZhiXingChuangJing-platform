@@ -42,6 +42,39 @@
         </div>
 
         <form class="grid grid-cols-1 gap-6 md:grid-cols-2" @submit.prevent="handleCreateExhibition">
+          <div class="mb-2 md:col-span-2">
+            <span :class="labelClass">选择展厅模板</span>
+            <p class="mb-3 text-xs text-stone-500">选择模板将预设展区结构和导航热点，也可选择空白展厅自由创建。</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <button
+                type="button"
+                class="template-card"
+                :class="{ 'template-card-active': !exhibitionForm.templateCode }"
+                @click="exhibitionForm.templateCode = ''"
+              >
+                <div class="flex h-24 items-center justify-center rounded-lg bg-stone-100 text-3xl text-stone-300">+</div>
+                <p class="mt-2 text-sm font-medium text-stone-700">空白展厅</p>
+                <p class="text-xs text-stone-400">自由创建，无预设结构</p>
+              </button>
+              <button
+                v-for="tpl in templates"
+                :key="tpl.templateCode"
+                type="button"
+                class="template-card"
+                :class="{ 'template-card-active': exhibitionForm.templateCode === tpl.templateCode }"
+                @click="exhibitionForm.templateCode = tpl.templateCode"
+              >
+                <img v-if="tpl.previewUrl" :src="tpl.previewUrl" class="h-24 w-full rounded-lg object-cover" />
+                <div v-else class="flex h-24 items-center justify-center rounded-lg bg-red-50 text-sm text-red-300">{{ tpl.templateType }}</div>
+                <p class="mt-2 text-sm font-medium text-stone-700">{{ tpl.templateName }}</p>
+                <div class="flex gap-1.5">
+                  <span class="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500">{{ tpl.templateType }}</span>
+                  <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-600">{{ tpl.difficultyLevel }}</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <label class="block md:col-span-2">
             <span :class="labelClass">展厅标题</span>
             <input
@@ -151,9 +184,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { uploadAsset } from '@/api/modules/assets'
-import { createExhibition, getMyExhibitions } from '@/api/modules/exhibitions'
+import { createExhibition, getExhibitionTemplates, getMyExhibitions } from '@/api/modules/exhibitions'
 import { getTaskList } from '@/api/modules/tasks'
-import type { CreateExhibitionRequest, ExhibitionSummary, TaskSummary } from '@/api/types'
+import type { CreateExhibitionRequest, ExhibitionSummary, ExhibitionTemplate, TaskSummary } from '@/api/types'
 import MetricTile from '@/components/common/MetricTile.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import { useAppStore } from '@/stores/app'
@@ -173,6 +206,7 @@ const coverUploading = ref(false)
 const errorMessage = ref('')
 const exhibitions = ref<ExhibitionSummary[]>([])
 const taskOptions = ref<TaskSummary[]>([])
+const templates = ref<ExhibitionTemplate[]>([])
 
 const exhibitionForm = reactive({
   taskId: '',
@@ -181,6 +215,7 @@ const exhibitionForm = reactive({
   coverUrl: '',
   visibility: 'class' as 'private' | 'class' | 'public',
   groupName: '',
+  templateCode: '',
 })
 
 const draftCount = computed(() => exhibitions.value.filter((item) => item.status === 'draft').length)
@@ -193,12 +228,14 @@ const stats = computed(() => [
 
 async function fetchMeta() {
   try {
-    const [myPage, taskPage] = await Promise.all([
+    const [myPage, taskPage, tplList] = await Promise.all([
       getMyExhibitions({ page: 1, pageSize: 20 }),
       getTaskList({ page: 1, pageSize: 50 }),
+      getExhibitionTemplates().catch(() => [] as ExhibitionTemplate[]),
     ])
     exhibitions.value = myPage.list
     taskOptions.value = taskPage.list
+    templates.value = tplList
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '展厅基础数据加载失败')
   }
@@ -216,6 +253,7 @@ async function handleCreateExhibition() {
       coverUrl: exhibitionForm.coverUrl.trim() || null,
       visibility: exhibitionForm.visibility,
       groupName: exhibitionForm.groupName.trim() || null,
+      templateCode: exhibitionForm.templateCode || null,
     }
 
     await createExhibition(payload)
@@ -277,5 +315,12 @@ onMounted(fetchMeta)
 
 .clean-select::-ms-expand {
   display: none;
+}
+
+.template-card {
+  @apply rounded-xl border-2 border-transparent bg-white p-3 text-left transition hover:border-stone-200 hover:shadow-sm;
+}
+.template-card-active {
+  @apply border-red-700 shadow-md shadow-red-100;
 }
 </style>
