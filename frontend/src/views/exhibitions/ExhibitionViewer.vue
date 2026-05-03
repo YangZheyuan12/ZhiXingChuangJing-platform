@@ -153,7 +153,11 @@
     />
 
     <ExhibitDetailModal :exhibit="selectedExhibitDetail" @close="selectedExhibitDetail = null" />
-    <DigitalHumanWidget :visible="!!bundle?.digitalHuman" />
+    <DigitalHumanWidget
+      :visible="hasNarrationContent"
+      :current-zone="currentZone"
+      :zone-exhibits="zoneExhibits"
+    />
   </div>
 </template>
 
@@ -239,6 +243,11 @@ const zoneExhibits = computed(() =>
     ? allExhibits.value.filter(e => e.zoneId === currentZone.value!.id)
     : [],
 )
+
+const hasNarrationContent = computed(() => {
+  if (currentZone.value?.narrationText && currentZone.value.narrationText.trim()) return true
+  return zoneExhibits.value.some(e => e.narrations?.some(n => n.content && n.content.trim()))
+})
 const currentHotspots = computed(() =>
   currentZone.value
     ? allHotspots.value.filter(h => h.zoneId === currentZone.value!.id)
