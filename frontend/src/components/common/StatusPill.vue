@@ -35,6 +35,10 @@ const label = computed(() => {
       return '已提交'
     case 'reviewed':
       return '已评审'
+    case 'approved':
+      return '已通过'
+    case 'returned':
+      return '已退回'
     case 'inactive':
       return '停用'
     case 'image':
@@ -78,6 +82,10 @@ const classes = computed(() => {
       return 'bg-sky-50 text-sky-700'
     case 'reviewed':
       return 'bg-violet-50 text-violet-700'
+    case 'approved':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'returned':
+      return 'bg-rose-100 text-rose-700'
     default:
       return 'bg-slate-100 text-slate-600'
   }

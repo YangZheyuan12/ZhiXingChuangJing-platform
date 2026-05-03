@@ -10,9 +10,16 @@
 
     <p v-if="errorMessage" class="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{{ errorMessage }}</p>
 
+    <div v-if="detail" class="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+      <span class="text-sm text-slate-500">当前状态：</span>
+      <StatusPill :value="detail.submissionStatus" />
+      <span v-if="detail.submissionStatus === 'approved'" class="text-xs text-emerald-700">该提交已通过审核，可进行发布</span>
+      <span v-else-if="detail.submissionStatus === 'returned'" class="text-xs text-rose-700">该提交已退回，请提交人修改后重新提交</span>
+    </div>
+
     <div class="grid gap-6 lg:grid-cols-4">
       <MetricTile label="提交版本" :value="detail?.versionNo ?? '--'" hint="对应展厅版本号" />
-      <MetricTile label="提交状态" :value="detail?.submissionStatus ?? '--'" hint="submitted / reviewed" />
+      <MetricTile label="提交状态" :value="statusText" hint="submitted / reviewed / approved / returned" />
       <MetricTile label="点评数量" :value="detail?.reviews.length ?? 0" hint="含当前教师历史点评" />
       <MetricTile label="提交人" :value="detail?.submitter.nickname || detail?.submitter.name || '--'" hint="提交作品的账号" />
     </div>
@@ -68,24 +75,103 @@
           <form class="space-y-4" @submit.prevent="handleReviewSubmit">
             <label class="block">
               <span class="form-label">评分</span>
-              <input v-model.number="reviewForm.score" type="number" min="0" max="100" class="form-control" />
+              <input v-model.number="reviewForm.score" type="number" min="0" max="100" class="form-control" :disabled="isFinalized" />
             </label>
             <label class="block">
               <span class="form-label">点评内容</span>
-              <textarea v-model="reviewForm.commentText" rows="4" class="form-textarea" />
+              <textarea v-model="reviewForm.commentText" rows="4" class="form-textarea" :disabled="isFinalized" />
             </label>
             <label class="flex items-center gap-3 text-sm text-slate-600">
-              <input v-model="reviewForm.isPublic" type="checkbox" class="form-checkbox" />
+              <input v-model="reviewForm.isPublic" type="checkbox" class="form-checkbox" :disabled="isFinalized" />
               公开展示给学生
             </label>
             <button
               type="submit"
-              :disabled="submittingReview"
+              :disabled="submittingReview || isFinalized"
               class="rounded-2xl bg-brand-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-slate-300"
             >
-              {{ submittingReview ? '提交中...' : '提交点评' }}
+              {{ submittingReview ? '提交中...' : '保存点评' }}
             </button>
+            <p v-if="isFinalized" class="text-xs text-slate-400">当前提交已进入终态，不允许追加点评。</p>
           </form>
+        </div>
+
+        <div v-if="canReview && !isFinalized" class="panel-card p-6">
+          <SectionHeader title="审核决策" description="选择通过或退回提交。通过后提交人可发布展厅；退回后提交人需修改后重新提交。" />
+
+          <div v-if="actionMode === null" class="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              class="flex-1 min-w-[8rem] rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+              @click="actionMode = 'approve'"
+            >
+              ✓ 通过提交
+            </button>
+            <button
+              type="button"
+              class="flex-1 min-w-[8rem] rounded-2xl border border-rose-300 bg-rose-50 px-5 py-3 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+              @click="actionMode = 'return'"
+            >
+              ✖ 退回提交
+            </button>
+          </div>
+
+          <div v-else-if="actionMode === 'approve'" class="mt-4 space-y-3 rounded-2xl bg-emerald-50/50 p-4">
+            <p class="text-sm font-medium text-emerald-800">确认通过该提交？</p>
+            <label class="block">
+              <span class="form-label">总评（选填）</span>
+              <textarea v-model="approveForm.comment" rows="3" class="form-textarea" placeholder="作品主题鲜明，排版仔细..." />
+            </label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                :disabled="actionSubmitting"
+                class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-300"
+                @click="handleApprove"
+              >
+                {{ actionSubmitting ? '提交中...' : '确认通过' }}
+              </button>
+              <button
+                type="button"
+                :disabled="actionSubmitting"
+                class="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+                @click="resetActionMode"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="mt-4 space-y-3 rounded-2xl bg-rose-50/50 p-4">
+            <p class="text-sm font-medium text-rose-800">请说明退回原因</p>
+            <label class="block">
+              <span class="form-label">退回理由 <span class="text-rose-500">*</span></span>
+              <textarea
+                v-model="returnForm.reason"
+                rows="4"
+                class="form-textarea"
+                placeholder="例如：提交说明不完整、展区内容与任务主题不符合..."
+              />
+            </label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                :disabled="actionSubmitting || !returnForm.reason.trim()"
+                class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:bg-slate-300"
+                @click="handleReturn"
+              >
+                {{ actionSubmitting ? '提交中...' : '确认退回' }}
+              </button>
+              <button
+                type="button"
+                :disabled="actionSubmitting"
+                class="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+                @click="resetActionMode"
+              >
+                取消
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="panel-card p-6">
@@ -116,12 +202,13 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { getErrorMessage } from '@/utils/request'
-import { createSubmissionReview, getSubmissionDetail } from '@/api/modules/submissions'
+import { approveSubmission, createSubmissionReview, getSubmissionDetail, returnSubmission } from '@/api/modules/submissions'
 import type { SubmissionDetail } from '@/api/types'
 import EmptyStatePanel from '@/components/common/EmptyStatePanel.vue'
 import MetricTile from '@/components/common/MetricTile.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import SectionHeader from '@/components/common/SectionHeader.vue'
+import StatusPill from '@/components/common/StatusPill.vue'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/format'
@@ -138,11 +225,35 @@ const detail = ref<SubmissionDetail | null>(null)
 
 const reviewForm = reactive({
   score: 95,
-  commentText: '主题表达完整，叙事结构清晰，建议进一步增强视觉层次与互动引导。',
+  commentText: '',
   isPublic: true,
 })
 
+const actionMode = ref<'approve' | 'return' | null>(null)
+const actionSubmitting = ref(false)
+const approveForm = reactive({ score: null as number | null, comment: '' })
+const returnForm = reactive({ reason: '' })
+
 const canReview = computed(() => ['teacher', 'admin'].includes(authStore.user?.role || ''))
+const isFinalized = computed(
+  () => detail.value?.submissionStatus === 'approved' || detail.value?.submissionStatus === 'returned',
+)
+const statusText = computed(() => {
+  const map: Record<string, string> = {
+    submitted: '待审核',
+    reviewed: '已评分',
+    approved: '已通过',
+    returned: '已退回',
+  }
+  return map[detail.value?.submissionStatus ?? ''] ?? '--'
+})
+
+function resetActionMode() {
+  actionMode.value = null
+  approveForm.score = null
+  approveForm.comment = ''
+  returnForm.reason = ''
+}
 
 async function fetchSubmissionDetail() {
   loading.value = true
@@ -169,6 +280,38 @@ async function handleReviewSubmit() {
     errorMessage.value = getErrorMessage(error, '点评提交失败')
   } finally {
     submittingReview.value = false
+  }
+}
+
+async function handleApprove() {
+  actionSubmitting.value = true
+  try {
+    await approveSubmission(submissionId, {
+      score: approveForm.score,
+      comment: approveForm.comment.trim() || null,
+    })
+    appStore.showToast('提交已通过审核', 'success')
+    resetActionMode()
+    await fetchSubmissionDetail()
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '审核通过失败'), 'error')
+  } finally {
+    actionSubmitting.value = false
+  }
+}
+
+async function handleReturn() {
+  if (!returnForm.reason.trim()) return
+  actionSubmitting.value = true
+  try {
+    await returnSubmission(submissionId, { reason: returnForm.reason.trim() })
+    appStore.showToast('提交已退回', 'success')
+    resetActionMode()
+    await fetchSubmissionDetail()
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '退回提交失败'), 'error')
+  } finally {
+    actionSubmitting.value = false
   }
 }
 
