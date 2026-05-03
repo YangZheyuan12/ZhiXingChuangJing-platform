@@ -10,53 +10,96 @@
     </div>
   </div>
 
-  <div v-else class="flex min-h-screen flex-col bg-neutral-100">
+  <div v-else class="flex h-screen flex-col bg-neutral-100">
     <!-- ═══ 顶栏 ═══ -->
     <header class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
       <div class="flex items-center gap-3">
         <button type="button" class="rounded-md px-3 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100" @click="router.back()">← 返回</button>
-        <h1 class="text-base font-semibold text-gray-900">{{ viewer?.exhibition.title || '展厅浏览' }}</h1>
+        <h1 class="text-base font-semibold text-gray-900">{{ bundle?.exhibition.title || '展厅浏览' }}</h1>
+        <span v-if="currentZone" class="rounded bg-brand-50 px-2 py-0.5 text-xs text-brand-700">{{ currentZone.title }}</span>
       </div>
       <div class="flex items-center gap-4 text-sm text-gray-500">
-        <span v-if="viewer?.exhibition.groupName">{{ viewer.exhibition.groupName }}</span>
-        <span>{{ viewer?.exhibition.ownerName }}</span>
+        <span v-if="bundle?.exhibition.groupName">{{ bundle.exhibition.groupName }}</span>
+        <span>{{ bundle?.exhibition.ownerName }}</span>
       </div>
     </header>
 
-    <!-- ═══ 画布区域 ═══ -->
-    <main class="flex flex-1 items-center justify-center p-6">
-      <div ref="viewerWrapper" class="relative">
-        <canvas ref="viewerCanvasEl" />
-
-        <!-- 视频/音频覆盖层：在画布对应位置覆盖真实的 HTML5 播放器 -->
-        <div
-          v-for="(media, idx) in mediaOverlays"
-          :key="idx"
-          class="absolute overflow-hidden rounded-xl"
-          :style="media.style"
-        >
-          <video
-            v-if="media.type === 'video'"
-            :src="media.url"
-            controls
-            preload="metadata"
-            class="h-full w-full bg-black object-contain"
-          />
-          <audio
-            v-else
-            :src="media.url"
-            controls
-            preload="metadata"
-            class="w-full"
-          />
+    <div class="flex min-h-0 flex-1 overflow-hidden">
+      <!-- ═══ 左侧导览面板 ═══ -->
+      <aside class="hidden w-56 shrink-0 flex-col border-r border-gray-200 bg-white p-3 md:flex">
+        <MiniMap
+          :zones="zones"
+          :current-zone-id="currentZone?.id ?? null"
+          @navigate="handleZoneNavigate"
+        />
+        <div v-if="zoneExhibits.length" class="mt-4">
+          <h3 class="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">本展区展品</h3>
+          <div class="space-y-1">
+            <button
+              v-for="ex in zoneExhibits"
+              :key="ex.id"
+              type="button"
+              class="w-full truncate rounded-lg px-3 py-2 text-left text-sm text-gray-600 transition hover:bg-gray-50"
+              @click="openExhibitDetail(ex)"
+            >
+              {{ ex.title }}
+            </button>
+          </div>
         </div>
-      </div>
-    </main>
+      </aside>
+
+      <!-- ═══ 画布区域 ═══ -->
+      <main class="relative flex min-w-0 flex-1 flex-col">
+        <div class="flex flex-1 items-center justify-center overflow-hidden p-4">
+          <div ref="viewerWrapper" class="relative">
+            <div v-if="currentZone?.backgroundUrl" class="absolute inset-0">
+              <img :src="currentZone.backgroundUrl" class="h-full w-full object-cover" :style="{ width: stageWidth + 'px', height: stageHeight + 'px' }" />
+            </div>
+
+            <canvas ref="viewerCanvasEl" class="relative" />
+
+            <HotspotButtons
+              :hotspots="currentHotspots"
+              @navigate="handleHotspotNavigate"
+            />
+
+            <!-- 视频/音频覆盖层 -->
+            <div
+              v-for="(media, idx) in mediaOverlays"
+              :key="idx"
+              class="absolute overflow-hidden rounded-xl"
+              :style="media.style"
+            >
+              <video
+                v-if="media.type === 'video'"
+                :src="media.url"
+                controls
+                preload="metadata"
+                class="h-full w-full bg-black object-contain"
+              />
+              <audio
+                v-else
+                :src="media.url"
+                controls
+                preload="metadata"
+                class="w-full"
+              />
+            </div>
+          </div>
+        </div>
+
+        <ViewerNavigation
+          :current-index="currentZoneIndex"
+          :total="zones.length"
+          @prev="navigatePrev"
+          @next="navigateNext"
+        />
+      </main>
+    </div>
 
     <!-- ═══ 评论区域 ═══ -->
     <section v-if="viewer && (viewer.teacherReviews.length > 0 || viewer.comments.length > 0)" class="border-t border-gray-200 bg-white px-6 py-8">
       <div class="mx-auto max-w-4xl space-y-8">
-        <!-- 教师点评 -->
         <div v-if="viewer.teacherReviews.length > 0">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-widest text-gray-400">教师点评</h2>
           <div class="space-y-3">
@@ -71,7 +114,6 @@
           </div>
         </div>
 
-        <!-- 学生评论 -->
         <div v-if="viewer.comments.length > 0">
           <h2 class="mb-4 text-sm font-semibold uppercase tracking-widest text-gray-400">评论</h2>
           <div class="space-y-3">
@@ -86,6 +128,9 @@
         </div>
       </div>
     </section>
+
+    <ExhibitDetailModal :exhibit="selectedExhibitDetail" @close="selectedExhibitDetail = null" />
+    <DigitalHumanWidget :visible="!!bundle?.digitalHuman" />
   </div>
 </template>
 
@@ -93,9 +138,21 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Canvas } from 'fabric'
-import { getExhibitionViewer, getExhibitionVersions } from '@/api/modules/exhibitions'
+import { getExhibitionViewer } from '@/api/modules/exhibitions'
+import { getEditorBundle } from '@/api/modules/editor-bundle'
 import { getErrorMessage } from '@/utils/request'
-import type { ExhibitionViewerData, ExhibitionVersion } from '@/api/types'
+import type {
+  EditorBundleResponse,
+  ExhibitDetail,
+  ExhibitionViewerData,
+  HotspotDetail,
+  ZoneDetail,
+} from '@/api/types'
+import MiniMap from '@/components/exhibitions/viewer/MiniMap.vue'
+import HotspotButtons from '@/components/exhibitions/viewer/HotspotButtons.vue'
+import ViewerNavigation from '@/components/exhibitions/viewer/ViewerNavigation.vue'
+import ExhibitDetailModal from '@/components/exhibitions/viewer/ExhibitDetailModal.vue'
+import DigitalHumanWidget from '@/components/exhibitions/viewer/DigitalHumanWidget.vue'
 
 const LOGICAL_WIDTH = 1920
 const LOGICAL_HEIGHT = 1080
@@ -106,34 +163,61 @@ const exhibitionId = Number(route.params.exhibitionId)
 
 const loading = ref(true)
 const errorMessage = ref('')
+const bundle = ref<EditorBundleResponse | null>(null)
 const viewer = ref<ExhibitionViewerData | null>(null)
-const versions = ref<ExhibitionVersion[]>([])
 
+// ─── 展区管理 ───
+const zones = computed<ZoneDetail[]>(() => bundle.value?.zones ?? [])
+const currentZoneIndex = ref(0)
+const currentZone = computed<ZoneDetail | null>(() => zones.value[currentZoneIndex.value] ?? null)
+
+const allExhibits = computed<ExhibitDetail[]>(() => bundle.value?.exhibits ?? [])
+const allHotspots = computed<HotspotDetail[]>(() => bundle.value?.hotspots ?? [])
+
+const zoneExhibits = computed(() =>
+  currentZone.value
+    ? allExhibits.value.filter(e => e.zoneId === currentZone.value!.id)
+    : [],
+)
+const currentHotspots = computed(() =>
+  currentZone.value
+    ? allHotspots.value.filter(h => h.zoneId === currentZone.value!.id)
+    : [],
+)
+
+const selectedExhibitDetail = ref<ExhibitDetail | null>(null)
+
+// ─── 画布 ───
 const viewerCanvasEl = ref<HTMLCanvasElement | null>(null)
 const viewerWrapper = ref<HTMLElement | null>(null)
 const fabricCanvas = shallowRef<Canvas | null>(null)
 let resizeObserver: ResizeObserver | null = null
 
 const displayZoom = ref(1)
+const stageWidth = computed(() => LOGICAL_WIDTH * displayZoom.value)
+const stageHeight = computed(() => LOGICAL_HEIGHT * displayZoom.value)
 
 interface MediaOverlay {
   type: 'video' | 'audio'
   url: string
   style: Record<string, string>
 }
-
 const mediaOverlays = ref<MediaOverlay[]>([])
 
-async function loadViewer() {
+// ═══════════════════════════════════════════════════════════
+//  数据加载
+// ═══════════════════════════════════════════════════════════
+
+async function loadData() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [viewerData, versionList] = await Promise.all([
-      getExhibitionViewer(exhibitionId),
-      getExhibitionVersions(exhibitionId).catch(() => [] as ExhibitionVersion[]),
+    const [bundleData, viewerData] = await Promise.all([
+      getEditorBundle(exhibitionId),
+      getExhibitionViewer(exhibitionId).catch(() => null),
     ])
+    bundle.value = bundleData
     viewer.value = viewerData
-    versions.value = versionList
   } catch (e) {
     errorMessage.value = getErrorMessage(e, '展厅加载失败')
   } finally {
@@ -141,13 +225,16 @@ async function loadViewer() {
   }
 }
 
-function initViewerCanvas() {
-  if (!viewerCanvasEl.value || !viewer.value) return
+// ═══════════════════════════════════════════════════════════
+//  画布
+// ═══════════════════════════════════════════════════════════
 
+function initViewerCanvas() {
+  if (!viewerCanvasEl.value) return
   const canvas = new Canvas(viewerCanvasEl.value, {
     width: LOGICAL_WIDTH,
     height: LOGICAL_HEIGHT,
-    backgroundColor: viewer.value.renderData?.canvasConfig?.background || '#f7efe9',
+    backgroundColor: 'transparent',
     selection: false,
   })
   fabricCanvas.value = canvas
@@ -161,7 +248,7 @@ function fitToContainer() {
   const canvas = fabricCanvas.value
   if (!canvas) return
 
-  const maxW = Math.min(window.innerWidth - 48, 1440)
+  const maxW = Math.min(window.innerWidth - 280, 1440)
   const maxH = window.innerHeight - 200
   const zoom = Math.min(maxW / LOGICAL_WIDTH, maxH / LOGICAL_HEIGHT)
 
@@ -175,39 +262,23 @@ function fitToContainer() {
   updateMediaOverlays()
 }
 
-async function renderVersionData() {
+// ═══════════════════════════════════════════════════════════
+//  展区渲染 & 切换
+// ═══════════════════════════════════════════════════════════
+
+async function renderCurrentZone() {
   const canvas = fabricCanvas.value
-  if (!canvas || !viewer.value) return
+  const zone = currentZone.value
+  if (!canvas || !zone) return
 
-  const vd = viewer.value.renderData
-  if (!vd?.canvasConfig) return
+  canvas.clear()
+  canvas.backgroundColor = 'transparent'
 
-  const rawData = (viewer.value as any).renderData?.canvasConfig
-  const savedW = rawData?.width || LOGICAL_WIDTH
-  const savedH = rawData?.height || LOGICAL_HEIGHT
-
-  // 尝试从 versionData 加载
-  const versionJson = findVersionJson()
-  if (versionJson) {
-    await canvas.loadFromJSON(versionJson)
-
-    // 兼容旧版不同逻辑尺寸
-    if (savedW !== LOGICAL_WIDTH || savedH !== LOGICAL_HEIGHT) {
-      const sx = LOGICAL_WIDTH / savedW
-      const sy = LOGICAL_HEIGHT / savedH
-      canvas.getObjects().forEach((obj) => {
-        obj.set({
-          left: (obj.left ?? 0) * sx,
-          top: (obj.top ?? 0) * sy,
-          scaleX: (obj.scaleX ?? 1) * sx,
-          scaleY: (obj.scaleY ?? 1) * sy,
-        })
-        obj.setCoords()
-      })
-    }
+  const data = zone.canvasData
+  if (data && typeof data === 'object' && 'objects' in data) {
+    await canvas.loadFromJSON(data)
   }
 
-  // 禁止交互
   canvas.getObjects().forEach((obj) => {
     obj.set({ selectable: false, evented: false })
   })
@@ -217,27 +288,39 @@ async function renderVersionData() {
   collectMediaOverlays()
 }
 
-function findVersionJson(): Record<string, unknown> | null {
-  // 优先从已发布的版本中获取原始 Fabric JSON
-  const publishedNo = viewer.value?.exhibition?.publishedVersionNo
-  if (publishedNo && versions.value.length > 0) {
-    const published = versions.value.find((v) => v.versionNo === publishedNo)
-    if (published?.versionData && typeof published.versionData === 'object' && 'objects' in published.versionData) {
-      return published.versionData
-    }
-  }
-  // 回退：取最新版本
-  if (versions.value.length > 0) {
-    const latest = versions.value[0]
-    if (latest?.versionData && typeof latest.versionData === 'object' && 'objects' in latest.versionData) {
-      return latest.versionData
-    }
-  }
-  // 最后回退：尝试 renderData 本身
-  const rd = viewer.value?.renderData as any
-  if (rd?.objects) return rd
-  return null
+function handleZoneNavigate(zone: ZoneDetail) {
+  const idx = zones.value.findIndex(z => z.id === zone.id)
+  if (idx >= 0) switchToZone(idx)
 }
+
+function handleHotspotNavigate(hotspot: HotspotDetail) {
+  if (hotspot.targetZoneId) {
+    const idx = zones.value.findIndex(z => z.id === hotspot.targetZoneId)
+    if (idx >= 0) switchToZone(idx)
+  }
+}
+
+function navigatePrev() {
+  if (currentZoneIndex.value > 0) switchToZone(currentZoneIndex.value - 1)
+}
+
+function navigateNext() {
+  if (currentZoneIndex.value < zones.value.length - 1) switchToZone(currentZoneIndex.value + 1)
+}
+
+async function switchToZone(idx: number) {
+  currentZoneIndex.value = idx
+  mediaOverlays.value = []
+  await renderCurrentZone()
+}
+
+function openExhibitDetail(exhibit: ExhibitDetail) {
+  selectedExhibitDetail.value = exhibit
+}
+
+// ═══════════════════════════════════════════════════════════
+//  媒体覆盖层
+// ═══════════════════════════════════════════════════════════
 
 function collectMediaOverlays() {
   const canvas = fabricCanvas.value
@@ -284,11 +367,15 @@ function computeOverlayStyle(obj: any): Record<string, string> {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  生命周期
+// ═══════════════════════════════════════════════════════════
+
 onMounted(async () => {
-  await loadViewer()
-  if (!errorMessage.value && viewer.value) {
+  await loadData()
+  if (!errorMessage.value && bundle.value) {
     initViewerCanvas()
-    await renderVersionData()
+    await renderCurrentZone()
   }
 })
 
