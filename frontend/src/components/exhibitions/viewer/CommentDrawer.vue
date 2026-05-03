@@ -40,7 +40,7 @@
                     {{ review.score }} 分
                   </span>
                 </div>
-                <p class="mt-1.5 text-sm leading-6 text-slate-700">{{ review.comment || '暂无点评内容' }}</p>
+                <p class="mt-1.5 text-sm leading-6 text-slate-700">{{ review.commentText || '暂无点评内容' }}</p>
                 <p class="mt-1 text-xs text-amber-600/70">{{ review.createdAt }}</p>
               </article>
             </div>

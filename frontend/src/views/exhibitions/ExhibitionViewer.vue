@@ -64,7 +64,7 @@
 
         <div class="flex items-center gap-3 border-l border-slate-200 pl-3 text-sm text-gray-500">
           <span v-if="bundle?.exhibition.groupName">{{ bundle.exhibition.groupName }}</span>
-          <span>{{ bundle?.exhibition.ownerName }}</span>
+          <span>{{ bundle?.exhibition.author?.nickname ?? '' }}</span>
         </div>
       </div>
     </header>

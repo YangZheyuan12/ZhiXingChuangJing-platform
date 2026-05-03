@@ -348,7 +348,7 @@ import {
   unfavoriteCommunityExhibition,
   unlikeCommunityExhibition,
 } from '@/api/modules/community'
-import type { Comment, CommunityComments, ExhibitionDetail } from '@/api/types'
+import type { Comment, CommunityComments, ExhibitionDetail, SubmissionReview } from '@/api/types'
 import EmptyStatePanel from '@/components/common/EmptyStatePanel.vue'
 import MetricTile from '@/components/common/MetricTile.vue'
 import PageHero from '@/components/common/PageHero.vue'
