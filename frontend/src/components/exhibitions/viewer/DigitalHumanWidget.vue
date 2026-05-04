@@ -1,105 +1,140 @@
 <template>
-  <div v-if="visible" class="pointer-events-none fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
-    <!-- 讲解气泡 -->
-    <Transition name="bubble">
-      <div
-        v-if="expanded && currentCard"
-        class="pointer-events-auto w-80 overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-xl"
-      >
-        <header class="flex items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-brand-50 to-sky-50 px-4 py-2.5">
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs text-white">AI</span>
-            <div class="min-w-0">
-              <p class="truncate text-xs font-semibold text-slate-900">{{ currentCard.title }}</p>
-              <p class="text-[11px] text-slate-500">{{ currentCard.sourceLabel }} · {{ currentIndex + 1 }} / {{ cards.length }}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="rounded-md p-1 text-slate-400 hover:bg-white/70 hover:text-slate-600"
-            title="收起"
-            @click="expanded = false"
-          >
-            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0L10 11.06l3.72 3.72a.75.75 0 101.06-1.06l-3.72-3.72 3.72-3.72a.75.75 0 10-1.06-1.06L10 8.94 6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 000 1.06z" clip-rule="evenodd" />
-            </svg>
-          </button>
-        </header>
+  <!-- ═══ 模式 A：展区已摆放数字人立绘，直接在画布里渲染 ═══ -->
+  <div
+    v-if="placement"
+    class="pointer-events-none absolute z-40"
+    :style="placementAnchorStyle"
+  >
+    <div class="relative">
+      <!-- 讲解气泡（挂在立绘上方） -->
+      <Transition name="bubble">
+        <NarrationBubbleCard
+          v-if="expanded && currentCard"
+          class="pointer-events-auto absolute bottom-full left-1/2 mb-3 w-80 -translate-x-1/2"
+          :card="currentCard"
+          :display-text="displayText"
+          :typing="typing"
+          v-model:auto-typing="autoTyping"
+          :index="currentIndex"
+          :total="cards.length"
+          @close="expanded = false"
+          @prev="goPrev"
+          @next="goNext"
+          @replay="replay"
+        />
+      </Transition>
 
-        <div class="max-h-56 overflow-y-auto px-4 py-3">
-          <p class="whitespace-pre-wrap text-sm leading-6 text-slate-700">{{ displayText }}<span v-if="typing" class="ml-0.5 inline-block w-0.5 animate-pulse bg-brand-500" style="height: 1em; vertical-align: middle;" /></p>
+      <!-- 立绘 = 触发按钮 -->
+      <button
+        type="button"
+        class="pointer-events-auto block bg-transparent p-0"
+        :class="cards.length ? 'cursor-pointer' : 'cursor-default'"
+        :disabled="!cards.length"
+        :title="cards.length ? '点击查看讲解' : placement.name"
+        @click="handleToggle"
+      >
+        <img
+          v-if="placement.avatar2dUrl"
+          :src="placement.avatar2dUrl"
+          :alt="placement.name"
+          :style="placementImageStyle"
+          class="block h-auto select-none drop-shadow-[0_8px_20px_rgba(0,0,0,0.3)]"
+          draggable="false"
+        />
+        <div
+          v-else
+          :style="placementImageStyle"
+          class="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-brand-300 bg-white/80 px-3 text-center text-xs font-medium text-brand-600 backdrop-blur-sm"
+        >
+          <span class="text-2xl">🧑‍🏫</span>
+          <span class="mt-1 line-clamp-2">{{ placement.name }}</span>
         </div>
 
-        <audio
-          v-if="currentCard.audioUrl"
-          ref="audioEl"
-          :src="currentCard.audioUrl"
-          preload="metadata"
-          class="w-full px-2"
-          controls
-        />
+        <!-- 名字标牌 -->
+        <div class="pointer-events-none absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-900/80 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+          {{ placement.name }}
+        </div>
 
-        <footer class="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-3 py-2">
-          <div class="flex items-center gap-1">
-            <button
-              type="button"
-              class="rounded-md p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"
-              :disabled="cards.length <= 1"
-              title="上一条"
-              @click="goPrev"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="rounded-md p-1.5 text-slate-600 hover:bg-white disabled:opacity-40"
-              :disabled="cards.length <= 1"
-              title="下一条"
-              @click="goNext"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </div>
-          <label class="flex items-center gap-1.5 text-[11px] text-slate-500">
-            <input v-model="autoTyping" type="checkbox" class="h-3 w-3 rounded border-slate-300" />
-            打字机
-          </label>
+        <!-- 未读徽标 -->
+        <span
+          v-if="cards.length && !expanded"
+          class="absolute right-0 top-0 inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-[11px] font-bold text-white shadow ring-2 ring-white"
+        >
+          {{ cards.length }}
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ 模式 B：未摆放立绘时的兵底 — 右下角悬浮按钮（无讲解内容也展示） ═══ -->
+  <div
+    v-else
+    class="pointer-events-none fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2"
+  >
+    <Transition name="bubble">
+      <!-- 有讲解：正常气泡 -->
+      <NarrationBubbleCard
+        v-if="expanded && currentCard"
+        class="pointer-events-auto w-80"
+        :card="currentCard"
+        :display-text="displayText"
+        :typing="typing"
+        v-model:auto-typing="autoTyping"
+        :index="currentIndex"
+        :total="cards.length"
+        @close="expanded = false"
+        @prev="goPrev"
+        @next="goNext"
+        @replay="replay"
+      />
+      <!-- 无讲解：空态提示气泡 -->
+      <div
+        v-else-if="expanded && !cards.length"
+        class="pointer-events-auto w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+      >
+        <div class="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+          <p class="text-xs font-semibold text-slate-700">💬 讲解词暂未准备</p>
           <button
             type="button"
-            class="rounded-md px-2 py-1 text-xs text-brand-700 hover:bg-white"
-            @click="replay"
-          >
-            重播
-          </button>
-        </footer>
+            class="rounded-md p-1 text-slate-400 hover:bg-white"
+            title="收起"
+            @click="expanded = false"
+          >✕</button>
+        </div>
+        <p class="px-4 py-3 text-xs leading-5 text-slate-500">
+          本展区暂时没有写讲解词，欢迎自由探索其他展区✨
+        </p>
       </div>
     </Transition>
 
-    <!-- 圆形触发按钮 -->
     <button
       type="button"
-      class="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-xl text-white shadow-xl ring-4 ring-white transition hover:scale-105"
-      :title="cards.length ? '查看讲解' : '暂无讲解词'"
+      class="pointer-events-auto relative flex h-14 w-14 items-center justify-center rounded-full text-xl shadow-xl ring-4 ring-white transition hover:scale-105"
+      :class="cards.length
+        ? 'bg-gradient-to-br from-brand-500 to-brand-700 text-white'
+        : 'bg-gradient-to-br from-slate-400 to-slate-500 text-white/90'"
+      :title="cards.length ? '查看讲解' : '暂无讲解词，点击查看提示'"
       @click="handleToggle"
     >
       <span v-if="expanded">🤖</span>
-      <span v-else class="flex items-center gap-0.5">
-        <span>🎙</span>
-        <span v-if="cards.length" class="absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold shadow">
-          {{ cards.length }}
-        </span>
+      <span v-else>🎙</span>
+      <span
+        v-if="cards.length && !expanded"
+        class="absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold shadow"
+      >
+        {{ cards.length }}
       </span>
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import type { ExhibitDetail, ZoneDetail } from '@/api/types'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { ExhibitDetail, ZoneDetail, ZoneDigitalHumanPlacement } from '@/api/types'
+import NarrationBubbleCard from './NarrationBubbleCard.vue'
+
+const BASE_AVATAR_WIDTH = 160
+const BASE_AVATAR_HEIGHT = 240
 
 interface NarrationCard {
   key: string
@@ -110,10 +145,47 @@ interface NarrationCard {
 }
 
 const props = defineProps<{
-  visible: boolean
   currentZone?: ZoneDetail | null
   zoneExhibits?: ExhibitDetail[]
+  /** 当前展区的数字人摆放，有值时以立绘模式渲染；否则退回右下角兵底。 */
+  placement?: ZoneDigitalHumanPlacement | null
+  /** 立绘定位用的舞台逻辑尺寸和显示缩放，立绘模式下必填。 */
+  stageWidth?: number
+  stageHeight?: number
+  zoom?: number
+  /** 切展区时自动弹首条讲解（默认 true） */
+  autoOpen?: boolean
 }>()
+
+// ─── 立绘模式定位 / 样式 ───
+const placementAnchorStyle = computed(() => {
+  if (!props.placement) return {}
+  const z = props.zoom ?? 1
+  const w = props.stageWidth ?? 1920
+  const h = props.stageHeight ?? 1080
+  const left = (props.placement.xPercent / 100) * w * z
+  const top = (props.placement.yPercent / 100) * h * z
+  // 锚点：立绘脚底中心
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    transform: 'translate(-50%, -100%)',
+  }
+})
+
+const placementImageStyle = computed(() => {
+  if (!props.placement) return {}
+  const z = props.zoom ?? 1
+  const scale = props.placement.scale || 1
+  const flipX = props.placement.facing === 'right' ? -1 : 1
+  return {
+    width: `${BASE_AVATAR_WIDTH * z * scale}px`,
+    height: `${BASE_AVATAR_HEIGHT * z * scale}px`,
+    objectFit: 'contain' as const,
+    transform: `scaleX(${flipX})`,
+    transformOrigin: 'center center',
+  }
+})
 
 const expanded = ref(false)
 const currentIndex = ref(0)
@@ -154,10 +226,7 @@ const currentCard = computed<NarrationCard | null>(() =>
 )
 
 function handleToggle() {
-  if (!cards.value.length) {
-    expanded.value = false
-    return
-  }
+  // 空态气泡也允许展开（显示"讲解词暂未准备"提示）；立绘按钮有 :disabled 兜住，这里保持通用
   expanded.value = !expanded.value
 }
 
@@ -235,6 +304,67 @@ watch(
     if (currentIndex.value >= len) currentIndex.value = 0
   },
 )
+
+// ─── 切展区自动弹首条讲解（默认开启，仅当有讲解时） ───
+let autoOpenTimer: number | null = null
+watch(
+  () => props.currentZone?.id,
+  (id) => {
+    if (autoOpenTimer != null) {
+      clearTimeout(autoOpenTimer)
+      autoOpenTimer = null
+    }
+    // 切换展区时先收起，避免老气泡残留
+    expanded.value = false
+    if (id == null) return
+    if (props.autoOpen === false) return
+    // 延迟 1s 后如果当前展区确实有讲解内容，自动弹开首条
+    autoOpenTimer = window.setTimeout(() => {
+      if (cards.value.length > 0) {
+        expanded.value = true
+      }
+    }, 1000)
+  },
+)
+
+// ─── 键盘快捷键：Esc 关、左右键翻页 ───
+function onKeyDown(e: KeyboardEvent) {
+  // 用户正在输入框里打字时不拦截
+  const target = e.target as HTMLElement | null
+  if (target) {
+    const tag = target.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
+  }
+  if (e.key === 'Escape') {
+    if (expanded.value) {
+      expanded.value = false
+      e.preventDefault()
+    }
+    return
+  }
+  if (!expanded.value) return
+  if (e.key === 'ArrowLeft') {
+    if (cards.value.length > 1) {
+      goPrev()
+      e.preventDefault()
+    }
+  } else if (e.key === 'ArrowRight') {
+    if (cards.value.length > 1) {
+      goNext()
+      e.preventDefault()
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeyDown)
+  if (autoOpenTimer != null) clearTimeout(autoOpenTimer)
+  stopTyping()
+})
 </script>
 
 <style scoped>

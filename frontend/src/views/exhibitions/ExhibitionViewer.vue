@@ -130,6 +130,16 @@
                 class="w-full"
               />
             </div>
+
+            <!-- 数字人立绘层：有摆放则在画布内渲染立绘 + 气泡，否则 Widget 内部退回右下角 -->
+            <DigitalHumanWidget
+              :current-zone="currentZone"
+              :zone-exhibits="zoneExhibits"
+              :placement="currentZonePlacement"
+              :stage-width="LOGICAL_WIDTH"
+              :stage-height="LOGICAL_HEIGHT"
+              :zoom="displayZoom"
+            />
           </div>
         </div>
 
@@ -153,11 +163,6 @@
     />
 
     <ExhibitDetailModal :exhibit="selectedExhibitDetail" @close="selectedExhibitDetail = null" />
-    <DigitalHumanWidget
-      :visible="hasNarrationContent"
-      :current-zone="currentZone"
-      :zone-exhibits="zoneExhibits"
-    />
   </div>
 </template>
 
@@ -181,6 +186,7 @@ import type {
   ExhibitionViewerData,
   HotspotDetail,
   ZoneDetail,
+  ZoneDigitalHumanPlacement,
 } from '@/api/types'
 import MiniMap from '@/components/exhibitions/viewer/MiniMap.vue'
 import HotspotButtons from '@/components/exhibitions/viewer/HotspotButtons.vue'
@@ -227,12 +233,21 @@ const currentZone = computed<ZoneDetail | null>(() => zones.value[currentZoneInd
 
 const allExhibits = computed<ExhibitDetail[]>(() => bundle.value?.exhibits ?? [])
 const allHotspots = computed<HotspotDetail[]>(() => bundle.value?.hotspots ?? [])
+const allZonePlacements = computed<ZoneDigitalHumanPlacement[]>(
+  () => bundle.value?.zoneDigitalHumans ?? [],
+)
 
 const zoneExhibits = computed(() =>
   currentZone.value
     ? allExhibits.value.filter(e => e.zoneId === currentZone.value!.id)
     : [],
 )
+
+/** 当前展区的数字人摆放，无摆放时 widget 退回右下角兜底。 */
+const currentZonePlacement = computed<ZoneDigitalHumanPlacement | null>(() => {
+  if (!currentZone.value) return null
+  return allZonePlacements.value.find(p => p.zoneId === currentZone.value!.id) ?? null
+})
 
 const hasNarrationContent = computed(() => {
   if (currentZone.value?.narrationText && currentZone.value.narrationText.trim()) return true

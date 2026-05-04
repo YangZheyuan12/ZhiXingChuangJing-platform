@@ -23,6 +23,133 @@
 
         <div class="mx-1 h-5 w-px bg-gray-200" />
 
+        <!-- 数字人摆放 -->
+        <div class="relative">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-brand-300 hover:bg-brand-50"
+            :disabled="!currentZone || digitalHumanBusy"
+            :title="currentZone ? '为当前展区指派数字人讲解员' : '请先选中或创建一个展区'"
+            @click="showDigitalHumanMenu = !showDigitalHumanMenu"
+          >
+            <img
+              v-if="currentZonePlacement?.avatar2dUrl"
+              :src="currentZonePlacement.avatar2dUrl"
+              :alt="currentZonePlacement.name"
+              class="h-5 w-5 rounded-full object-cover"
+            />
+            <span v-else class="text-base leading-none">🧍</span>
+            <span class="max-w-[8rem] truncate">
+              {{ currentZonePlacement ? currentZonePlacement.name : '指派数字人' }}
+            </span>
+            <span class="text-[10px] text-gray-400">▾</span>
+          </button>
+
+          <!-- 透明全屏遮罩，点空白处关闭菜单 -->
+          <div
+            v-if="showDigitalHumanMenu"
+            class="fixed inset-0 z-20"
+            @click="showDigitalHumanMenu = false"
+          />
+
+          <!-- 下拉面板 -->
+          <div
+            v-if="showDigitalHumanMenu"
+            class="absolute right-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+          >
+            <div class="border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+              选择该展区的讲解员（最多 1 个）
+            </div>
+
+            <!-- 当前摆放的微调：缩放 + 朝向 -->
+            <div
+              v-if="currentZonePlacement"
+              class="border-b border-gray-100 px-3 py-2.5"
+            >
+              <div class="mb-1.5 flex items-center justify-between text-[11px] text-gray-500">
+                <span>缩放</span>
+                <span class="tabular-nums text-gray-700">{{ currentZonePlacement.scale.toFixed(2) }}x</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="2"
+                step="0.05"
+                :value="currentZonePlacement.scale"
+                class="w-full accent-brand-600"
+                @change="onPlacementScaleChange"
+              />
+              <div class="mt-2.5 flex items-center justify-between text-[11px] text-gray-500">
+                <span>朝向</span>
+                <div class="flex gap-1">
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-0.5 text-xs transition"
+                    :class="currentZonePlacement.facing === 'left' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-100'"
+                    :disabled="digitalHumanBusy"
+                    @click="handleUpdatePlacementAttrs({ facing: 'left' })"
+                  >← 左</button>
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-0.5 text-xs transition"
+                    :class="currentZonePlacement.facing === 'right' ? 'bg-brand-100 text-brand-700' : 'text-gray-500 hover:bg-gray-100'"
+                    :disabled="digitalHumanBusy"
+                    @click="handleUpdatePlacementAttrs({ facing: 'right' })"
+                  >右 →</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="max-h-72 overflow-y-auto">
+              <button
+                v-if="currentZonePlacement"
+                type="button"
+                class="flex w-full items-center gap-2 border-b border-gray-100 px-3 py-2 text-left text-xs text-rose-600 transition hover:bg-rose-50 disabled:text-gray-400"
+                :disabled="digitalHumanBusy"
+                @click="handleRemoveZoneDigitalHuman"
+              >
+                <span class="text-base leading-none">🚫</span>
+                <span>从当前展区撤下数字人</span>
+              </button>
+
+              <div v-if="digitalHumans.length === 0" class="px-3 py-6 text-center text-xs text-gray-400">
+                还没有数字人角色。<br />
+                请先到「展厅详情 → 数字人」创建。
+              </div>
+
+              <button
+                v-for="dh in digitalHumans"
+                :key="dh.id"
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-brand-50 disabled:opacity-50"
+                :class="{ 'bg-brand-50': currentZonePlacement?.digitalHumanId === dh.id }"
+                :disabled="digitalHumanBusy"
+                @click="handleAssignDigitalHuman(dh)"
+              >
+                <img
+                  v-if="dh.avatar2dUrl"
+                  :src="dh.avatar2dUrl"
+                  :alt="dh.name"
+                  class="h-8 w-8 shrink-0 rounded-full object-cover"
+                />
+                <div v-else class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-base">
+                  🧍
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-xs font-medium text-gray-800">{{ dh.name }}</div>
+                  <div v-if="dh.persona" class="truncate text-[11px] text-gray-400">{{ dh.persona }}</div>
+                </div>
+                <span
+                  v-if="currentZonePlacement?.digitalHumanId === dh.id"
+                  class="text-xs text-brand-600"
+                >✓</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mx-1 h-5 w-px bg-gray-200" />
+
         <!-- 保存 / 提交审核 / 发布 -->
         <button type="button" :disabled="saving || conflictDetected" class="rounded-md bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-gray-300" @click="handleSave">
           {{ saving ? '保存中...' : '保存全部' }}
@@ -221,8 +348,11 @@
             :selected-hotspot-id="selectedHotspotId"
             :selected-exhibit-id="selectedExhibitId"
             :hotspot-draggable="activeRightTab === 'hotspot'"
+            :digital-human-placement="currentZonePlacement"
+            :digital-human-draggable="!!currentZonePlacement"
             @hotspot-select="handleHotspotClick"
             @hotspot-drag-end="handleHotspotDragEnd"
+            @digital-human-drag-end="handleDigitalHumanDragEnd"
           />
         </div>
 
@@ -346,10 +476,16 @@ import {
   updateHotspot as updateHotspotApi,
   deleteHotspot as deleteHotspotApi,
 } from '@/api/modules/hotspots'
+import {
+  placeZoneDigitalHuman,
+  removeZoneDigitalHuman,
+} from '@/api/modules/digital-human'
 import type {
   Asset,
   CreateExhibitRequest,
   CreateZoneRequest,
+  DigitalHuman,
+  ZoneDigitalHumanPlacement,
   EditorBundleResponse,
   ExhibitDetail,
   HotspotDetail,
@@ -398,6 +534,10 @@ const bundle = ref<EditorBundleResponse | null>(null)
 const bundleRevision = ref<number | null>(null)
 const allExhibits = ref<ExhibitDetail[]>([])
 const allHotspots = ref<HotspotDetail[]>([])
+const digitalHumans = ref<DigitalHuman[]>([])
+const zonePlacements = ref<ZoneDigitalHumanPlacement[]>([])
+const showDigitalHumanMenu = ref(false)
+const digitalHumanBusy = ref(false)
 const saving = ref(false)
 const publishing = ref(false)
 const conflictDetected = ref(false)
@@ -492,6 +632,12 @@ const { zoneExhibits, selectedExhibitId, selectedExhibit, selectExhibit } = em
 const zoneSlots = computed<SlotConfig[]>(() => {
   if (!currentZone.value?.layoutConfig?.slots) return []
   return currentZone.value.layoutConfig.slots
+})
+
+// ─── 当前展区的数字人摆放（zone : 数字人 = 1 : 1） ───
+const currentZonePlacement = computed<ZoneDigitalHumanPlacement | null>(() => {
+  if (!currentZone.value) return null
+  return zonePlacements.value.find(p => p.zoneId === currentZone.value!.id) ?? null
 })
 
 // ─── Composables ───
@@ -1115,6 +1261,114 @@ function handleAnchorModified(obj: FabricObject) {
       appStore.showToast(getErrorMessage(error, '位置保存失败'), 'error')
     }
   }, 400))
+}
+
+// ═══════════════════════════════════════════════════════════
+//  数字人摆放
+// ═══════════════════════════════════════════════════════════
+
+/** 把指定数字人摆到当前展区，已存在则覆盖（包括位置）。 */
+async function handleAssignDigitalHuman(digitalHuman: DigitalHuman) {
+  const zone = currentZone.value
+  if (!zone) {
+    appStore.showToast('请先选择一个展区', 'info')
+    return
+  }
+  digitalHumanBusy.value = true
+  try {
+    const placement = await placeZoneDigitalHuman(exhibitionId, zone.id, {
+      digitalHumanId: digitalHuman.id,
+    })
+    upsertLocalPlacement(placement)
+    appStore.showToast(`已让「${digitalHuman.name}」驻守该展区`, 'success')
+    showDigitalHumanMenu.value = false
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '数字人摆放失败'), 'error')
+  } finally {
+    digitalHumanBusy.value = false
+  }
+}
+
+/** 把当前展区的数字人撤下（不删除角色本身）。 */
+async function handleRemoveZoneDigitalHuman() {
+  const zone = currentZone.value
+  if (!zone) return
+  if (!currentZonePlacement.value) return
+  digitalHumanBusy.value = true
+  try {
+    await removeZoneDigitalHuman(exhibitionId, zone.id)
+    zonePlacements.value = zonePlacements.value.filter(p => p.zoneId !== zone.id)
+    appStore.showToast('数字人已从该展区撤下', 'success')
+    showDigitalHumanMenu.value = false
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '撤下数字人失败'), 'error')
+  } finally {
+    digitalHumanBusy.value = false
+  }
+}
+
+/** 修改当前摆放的缩放/朝向等非位置属性。 */
+async function handleUpdatePlacementAttrs(patch: { scale?: number; facing?: 'left' | 'right' }) {
+  const zone = currentZone.value
+  const placement = currentZonePlacement.value
+  if (!zone || !placement) return
+  const original = { ...placement }
+  const merged = { ...placement, ...patch }
+  upsertLocalPlacement(merged)
+  try {
+    const updated = await placeZoneDigitalHuman(exhibitionId, zone.id, {
+      digitalHumanId: placement.digitalHumanId,
+      xPercent: merged.xPercent,
+      yPercent: merged.yPercent,
+      scale: merged.scale,
+      facing: merged.facing,
+    })
+    upsertLocalPlacement(updated)
+  } catch (error) {
+    upsertLocalPlacement(original)
+    appStore.showToast(getErrorMessage(error, '更新数字人属性失败'), 'error')
+  }
+}
+
+/** 缩放滑块 onchange（松手时一次 API 调用）。 */
+function onPlacementScaleChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  const value = Number(target.value)
+  if (Number.isFinite(value)) {
+    handleUpdatePlacementAttrs({ scale: value })
+  }
+}
+
+/** 画布拖拽 emit 上来的位置变化。 */
+async function handleDigitalHumanDragEnd(xPercent: number, yPercent: number) {
+  const zone = currentZone.value
+  const placement = currentZonePlacement.value
+  if (!zone || !placement) return
+  // 乐观更新：先改本地，请求失败再回滚
+  const original = { ...placement }
+  upsertLocalPlacement({ ...placement, xPercent, yPercent })
+  try {
+    const updated = await placeZoneDigitalHuman(exhibitionId, zone.id, {
+      digitalHumanId: placement.digitalHumanId,
+      xPercent,
+      yPercent,
+      scale: placement.scale,
+      facing: placement.facing,
+    })
+    upsertLocalPlacement(updated)
+  } catch (error) {
+    upsertLocalPlacement(original)
+    appStore.showToast(getErrorMessage(error, '保存数字人位置失败'), 'error')
+  }
+}
+
+function upsertLocalPlacement(placement: ZoneDigitalHumanPlacement) {
+  const idx = zonePlacements.value.findIndex(p => p.zoneId === placement.zoneId)
+  if (idx >= 0) {
+    zonePlacements.value.splice(idx, 1, placement)
+  } else {
+    zonePlacements.value = [...zonePlacements.value, placement]
+  }
 }
 
 async function handleHotspotCreate() {
@@ -1786,6 +2040,8 @@ async function loadBundle() {
     bundleRevision.value = data.revision
     allExhibits.value = data.exhibits
     allHotspots.value = data.hotspots
+    digitalHumans.value = data.digitalHumans ?? []
+    zonePlacements.value = data.zoneDigitalHumans ?? []
     zm.setZones(data.zones)
 
     for (const zone of data.zones) {

@@ -16,6 +16,13 @@
       :active-slot-code="activeSlotCode"
       :used-slot-codes="usedSlotCodes"
     />
+    <DigitalHumanOverlay
+      class="z-[25]"
+      :placement="digitalHumanPlacement ?? null"
+      :zoom="zoom"
+      :draggable="digitalHumanDraggable"
+      @drag-end="(x, y) => emit('digital-human-drag-end', x, y)"
+    />
     <HotspotOverlay
       class="z-30"
       :hotspots="hotspots"
@@ -30,10 +37,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { ExhibitDetail, HotspotDetail, SlotConfig } from '@/api/types'
+import type { ExhibitDetail, HotspotDetail, SlotConfig, ZoneDigitalHumanPlacement } from '@/api/types'
 import SceneBackground from './SceneBackground.vue'
 import HotspotOverlay from './HotspotOverlay.vue'
 import ExhibitSlotOverlay from './ExhibitSlotOverlay.vue'
+import DigitalHumanOverlay from './DigitalHumanOverlay.vue'
 
 const props = defineProps<{
   backgroundUrl: string | null
@@ -47,11 +55,14 @@ const props = defineProps<{
   selectedHotspotId?: number | null
   selectedExhibitId?: number | null
   hotspotDraggable?: boolean
+  digitalHumanPlacement?: ZoneDigitalHumanPlacement | null
+  digitalHumanDraggable?: boolean
 }>()
 
 const emit = defineEmits<{
   'hotspot-select': [id: number]
   'hotspot-drag-end': [id: number, xPercent: number, yPercent: number]
+  'digital-human-drag-end': [xPercent: number, yPercent: number]
 }>()
 
 const usedSlotCodes = computed(() =>

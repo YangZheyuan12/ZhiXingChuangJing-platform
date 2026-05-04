@@ -807,9 +807,39 @@ export interface EditorBundleResponse {
   zones: ZoneDetail[]
   exhibits: ExhibitDetail[]
   hotspots: HotspotDetail[]
+  /** 兼容老前端：返回展厅最早创建的角色，新逻辑请用 digitalHumans */
   digitalHuman?: DigitalHuman | null
+  /** 展厅角色库（多角色） */
+  digitalHumans?: DigitalHuman[] | null
+  /** 各展区当前的数字人摆放（zone : 数字人 = 1 : 1） */
+  zoneDigitalHumans?: ZoneDigitalHumanPlacement[] | null
   template?: ExhibitionTemplate | null
   revision: number | null
+}
+
+/**
+ * 展区数字人摆放，包含位置/缩放/朝向 + 关联的角色基本信息便于直接渲染立绘。
+ */
+export interface ZoneDigitalHumanPlacement {
+  zoneId: number
+  digitalHumanId: number
+  name: string
+  avatar2dUrl?: string | null
+  model3dUrl?: string | null
+  persona?: string | null
+  voiceType?: string | null
+  xPercent: number
+  yPercent: number
+  scale: number
+  facing: 'left' | 'right'
+}
+
+export interface PlaceDigitalHumanRequest {
+  digitalHumanId: number
+  xPercent?: number | null
+  yPercent?: number | null
+  scale?: number | null
+  facing?: 'left' | 'right' | null
 }
 
 export interface SaveBundleRequest {

@@ -175,16 +175,93 @@
         </div>
 
         <div class="panel-card p-6">
-          <SectionHeader title="数字人设定" description="配置讲解角色的基础信息与故事内容。" />
-          <div v-if="canPublishExhibition" class="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <form class="grid gap-4 md:grid-cols-2" @submit.prevent="handleUpsertDigitalHuman">
+          <SectionHeader title="数字人角色库" description="同一展厅可创建多个讲解员，配合下方编辑器拖到不同展区。" />
+
+          <!-- 角色卡片网格 -->
+          <div class="mt-5 grid gap-4 md:grid-cols-2">
+            <article
+              v-for="dh in digitalHumans"
+              :key="dh.id"
+              class="rounded-2xl border bg-white p-4 transition"
+              :class="editingDigitalHumanId === dh.id ? 'border-brand-400 ring-2 ring-brand-200' : 'border-slate-200 hover:border-brand-200'"
+            >
+              <div class="flex items-start gap-3">
+                <img
+                  v-if="dh.avatar2dUrl"
+                  :src="dh.avatar2dUrl"
+                  :alt="dh.name"
+                  class="h-16 w-16 shrink-0 rounded-xl border border-slate-200 object-cover"
+                />
+                <div v-else class="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
+                  无形象
+                </div>
+                <div class="min-w-0 flex-1">
+                  <h4 class="truncate text-base font-semibold text-slate-900">{{ dh.name }}</h4>
+                  <p class="mt-1 text-xs text-slate-500">{{ dh.voiceType || '默认音色' }}</p>
+                  <p class="mt-2 line-clamp-2 text-xs text-slate-600">{{ dh.persona || '暂无人设描述' }}</p>
+                </div>
+              </div>
+              <div v-if="dh.equippedItems?.length" class="mt-3 flex flex-wrap gap-1.5">
+                <span
+                  v-for="item in dh.equippedItems"
+                  :key="item.id"
+                  class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+                >
+                  {{ item.resourceTitle }}
+                </span>
+              </div>
+              <div v-if="canPublishExhibition" class="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-brand-200 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:bg-brand-50"
+                  @click="handleStartEditDigitalHuman(dh)"
+                >
+                  编辑
+                </button>
+                <button
+                  type="button"
+                  :disabled="deletingDigitalHumanId === dh.id"
+                  class="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                  @click="handleDeleteDigitalHuman(dh)"
+                >
+                  {{ deletingDigitalHumanId === dh.id ? '删除中...' : '删除' }}
+                </button>
+              </div>
+            </article>
+
+            <!-- 「新建角色」入口卡片 -->
+            <button
+              v-if="canPublishExhibition && editingDigitalHumanId !== null"
+              type="button"
+              class="flex min-h-[140px] items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-sm font-medium text-slate-500 transition hover:border-brand-400 hover:text-brand-600"
+              @click="handleStartCreateDigitalHuman"
+            >
+              + 新建数字人角色
+            </button>
+          </div>
+
+          <!-- 编辑/新建表单（inline） -->
+          <div v-if="canPublishExhibition && editingDigitalHumanId !== null" class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div class="mb-4 flex items-center justify-between">
+              <h4 class="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {{ editingDigitalHumanId === 0 ? '新建角色' : '编辑角色' }}
+              </h4>
+              <button
+                type="button"
+                class="text-xs text-slate-500 transition hover:text-slate-700"
+                @click="handleCancelEditDigitalHuman"
+              >
+                取消
+              </button>
+            </div>
+            <form class="grid gap-4 md:grid-cols-2" @submit.prevent="handleSaveDigitalHuman">
               <label class="block md:col-span-2">
                 <span class="form-label">数字人名称</span>
-                <input v-model="digitalHumanForm.name" class="form-control" />
+                <input v-model="digitalHumanForm.name" class="form-control" required />
               </label>
               <label class="block">
                 <span class="form-label">音色</span>
-                <input v-model="digitalHumanForm.voiceType" class="form-control" />
+                <input v-model="digitalHumanForm.voiceType" class="form-control" placeholder="例如：温柔女声" />
               </label>
               <label class="block">
                 <span class="form-label">上传 2D 形象</span>
@@ -205,10 +282,10 @@
               </label>
               <label class="block md:col-span-2">
                 <span class="form-label">角色设定</span>
-                <textarea v-model="digitalHumanForm.persona" rows="2" class="form-textarea" />
+                <textarea v-model="digitalHumanForm.persona" rows="2" class="form-textarea" placeholder="例如：考古学家张教授，亲切博学" />
               </label>
               <label class="block md:col-span-2">
-                <span class="form-label">故事脚本</span>
+                <span class="form-label">故事脚本（可选，作为整个展厅的开场词）</span>
                 <textarea v-model="digitalHumanForm.storyScript" rows="3" class="form-textarea" />
               </label>
               <div class="md:col-span-2 flex flex-wrap gap-3">
@@ -217,59 +294,27 @@
                   :disabled="savingDigitalHuman"
                   class="rounded-2xl bg-brand-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:bg-slate-300"
                 >
-                  {{ savingDigitalHuman ? '保存中...' : '保存数字人信息' }}
+                  {{ savingDigitalHuman ? '保存中...' : (editingDigitalHumanId === 0 ? '创建角色' : '保存修改') }}
                 </button>
-                <RouterLink to="/museum" class="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600 transition hover:border-brand-300 hover:text-brand-700">
-                  打开文博资源库
-                </RouterLink>
               </div>
             </form>
           </div>
+
           <EmptyStatePanel
-            v-if="!loading && !digitalHuman"
+            v-if="!loading && digitalHumans.length === 0 && editingDigitalHumanId === null"
             eyebrow="Digital Human"
-            title="尚未创建数字人"
-            description="可先填写上方表单创建数字角色。"
+            title="尚未创建任何数字人"
+            description="点击下方按钮新建第一个角色。"
           />
-          <div v-else-if="digitalHuman" class="space-y-4">
-            <div class="rounded-2xl bg-brand-50 p-5">
-              <p class="text-xs uppercase tracking-[0.18em] text-brand-600">角色名称</p>
-              <h3 class="mt-2 text-2xl font-semibold text-brand-900">{{ digitalHuman.name }}</h3>
-              <p class="mt-3 text-sm leading-6 text-slate-600">{{ digitalHuman.persona || '暂无角色设定' }}</p>
-            </div>
-            <div>
-              <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">故事脚本</h4>
-              <p class="mt-3 text-sm leading-7 text-slate-600">{{ digitalHuman.storyScript || '暂无故事脚本。' }}</p>
-            </div>
-            <div>
-              <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">装备绑定</h4>
-              <form v-if="canPublishExhibition" class="mt-3 grid gap-3 md:grid-cols-[1fr_0.7fr_auto]" @submit.prevent="handleBindEquipment">
-                <select v-model="equipmentForm.museumResourceId" class="form-select">
-                  <option value="">选择文博资源</option>
-                  <option v-for="resource in museumResources" :key="resource.id" :value="String(resource.id)">
-                    {{ resource.title }}
-                  </option>
-                </select>
-                <input v-model="equipmentForm.slotCode" class="form-control" />
-                <button
-                  type="submit"
-                  :disabled="bindingEquipment || !equipmentForm.museumResourceId"
-                  class="rounded-2xl border border-brand-200 px-4 py-3 text-sm text-brand-700 transition hover:bg-brand-50 disabled:border-slate-200 disabled:text-slate-400"
-                >
-                  {{ bindingEquipment ? '绑定中...' : '绑定装备' }}
-                </button>
-              </form>
-              <div class="mt-3 flex flex-wrap gap-2">
-                <span
-                  v-for="item in digitalHuman.equippedItems"
-                  :key="item.id"
-                  class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600"
-                >
-                  {{ item.resourceTitle }}
-                </span>
-              </div>
-            </div>
-          </div>
+
+          <button
+            v-if="canPublishExhibition && editingDigitalHumanId === null"
+            type="button"
+            class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-brand-700"
+            @click="handleStartCreateDigitalHuman"
+          >
+            + 新建数字人角色
+          </button>
         </div>
       </section>
 
@@ -328,14 +373,17 @@ import { getErrorMessage } from '@/utils/request'
 import {
   addExhibitionMembers,
   getExhibitionDetail,
-  getExhibitionDigitalHuman,
   getExhibitionVersions,
   getExhibitionViewer,
   publishExhibition,
   saveExhibitionVersion,
-  upsertExhibitionDigitalHuman,
 } from '@/api/modules/exhibitions'
-import { addDigitalHumanEquipment } from '@/api/modules/digital-human'
+import {
+  createDigitalHuman,
+  deleteDigitalHuman as deleteDigitalHumanApi,
+  listDigitalHumans,
+  updateDigitalHuman,
+} from '@/api/modules/digital-human'
 import { getMuseumResources } from '@/api/modules/museum'
 import type {
   DigitalHuman,
@@ -366,7 +414,15 @@ const publishing = ref(false)
 const errorMessage = ref('')
 const detail = ref<ExhibitionDetail | null>(null)
 const viewer = ref<ExhibitionViewerData | null>(null)
-const digitalHuman = ref<DigitalHuman | null>(null)
+const digitalHumans = ref<DigitalHuman[]>([])
+/**
+ * 当前编辑中的数字人 id：
+ * - null = 未进入编辑/新建
+ * - 0    = 新建模式
+ * - 其他 = 编辑该 id 的角色
+ */
+const editingDigitalHumanId = ref<number | null>(null)
+const deletingDigitalHumanId = ref<number | null>(null)
 const versions = ref<ExhibitionVersion[]>([])
 const museumResources = ref<MuseumResource[]>([])
 const versionNote = ref('')
@@ -374,7 +430,6 @@ const publishVisibility = ref<'private' | 'class' | 'public'>('class')
 const lastSavedVersion = ref<ExhibitionVersion | null>(null)
 const addingMembers = ref(false)
 const savingDigitalHuman = ref(false)
-const bindingEquipment = ref(false)
 const avatarUploading = ref(false)
 const memberIdsInput = ref('')
 const memberRole = ref<'owner' | 'editor' | 'viewer'>('editor')
@@ -385,11 +440,6 @@ const digitalHumanForm = ref({
   persona: '',
   voiceType: '',
   storyScript: '',
-})
-const equipmentForm = ref({
-  museumResourceId: '',
-  slotCode: 'hand',
-  anchorCode: '',
 })
 
 const canSaveVersion = computed(() => {
@@ -413,29 +463,19 @@ async function fetchExhibitionDetail() {
   errorMessage.value = ''
 
   try {
-    const [detailData, viewerData, digitalHumanData, versionData, museumData] = await Promise.all([
+    const [detailData, viewerData, digitalHumanList, versionData, museumData] = await Promise.all([
       getExhibitionDetail(exhibitionId),
       getExhibitionViewer(exhibitionId),
-      getExhibitionDigitalHuman(exhibitionId).catch(() => null),
+      listDigitalHumans(exhibitionId).catch(() => [] as DigitalHuman[]),
       getExhibitionVersions(exhibitionId).catch(() => []),
       getMuseumResources({ page: 1, pageSize: 20 }).then((page) => page.list).catch(() => []),
     ])
     detail.value = detailData
     viewer.value = viewerData
-    digitalHuman.value = digitalHumanData
+    digitalHumans.value = digitalHumanList
     versions.value = versionData
     museumResources.value = museumData
     publishVisibility.value = (detailData.visibility as 'private' | 'class' | 'public') || 'class'
-    if (digitalHumanData) {
-      digitalHumanForm.value = {
-        name: digitalHumanData.name || '',
-        avatar2dUrl: digitalHumanData.avatar2dUrl || '',
-        model3dUrl: digitalHumanData.model3dUrl || '',
-        persona: digitalHumanData.persona || '',
-        voiceType: digitalHumanData.voiceType || '',
-        storyScript: digitalHumanData.storyScript || '',
-      }
-    }
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '展厅详情加载失败')
   } finally {
@@ -520,7 +560,43 @@ async function handleAddMembers() {
   }
 }
 
-async function handleUpsertDigitalHuman() {
+function resetDigitalHumanForm() {
+  digitalHumanForm.value = {
+    name: '',
+    avatar2dUrl: '',
+    model3dUrl: '',
+    persona: '',
+    voiceType: '',
+    storyScript: '',
+  }
+}
+
+function handleStartCreateDigitalHuman() {
+  resetDigitalHumanForm()
+  editingDigitalHumanId.value = 0
+}
+
+function handleStartEditDigitalHuman(dh: DigitalHuman) {
+  digitalHumanForm.value = {
+    name: dh.name || '',
+    avatar2dUrl: dh.avatar2dUrl || '',
+    model3dUrl: dh.model3dUrl || '',
+    persona: dh.persona || '',
+    voiceType: dh.voiceType || '',
+    storyScript: dh.storyScript || '',
+  }
+  editingDigitalHumanId.value = dh.id
+}
+
+function handleCancelEditDigitalHuman() {
+  resetDigitalHumanForm()
+  editingDigitalHumanId.value = null
+}
+
+async function handleSaveDigitalHuman() {
+  const editingId = editingDigitalHumanId.value
+  if (editingId === null) return
+
   savingDigitalHuman.value = true
   errorMessage.value = ''
 
@@ -529,8 +605,15 @@ async function handleUpsertDigitalHuman() {
       ...digitalHumanForm.value,
       storyTimeline: [],
     }
-    digitalHuman.value = await upsertExhibitionDigitalHuman(exhibitionId, payload)
-    appStore.showToast('数字人信息已保存', 'success')
+    if (editingId === 0) {
+      const created = await createDigitalHuman(exhibitionId, payload)
+      appStore.showToast(`角色「${created.name}」已创建`, 'success')
+    } else {
+      const updated = await updateDigitalHuman(editingId, payload)
+      appStore.showToast(`角色「${updated.name}」已保存`, 'success')
+    }
+    editingDigitalHumanId.value = null
+    resetDigitalHumanForm()
     await fetchExhibitionDetail()
   } catch (error) {
     errorMessage.value = getErrorMessage(error, '数字人保存失败')
@@ -539,28 +622,23 @@ async function handleUpsertDigitalHuman() {
   }
 }
 
-async function handleBindEquipment() {
-  if (!digitalHuman.value?.id) {
-    errorMessage.value = '请先创建数字人，再绑定文博资源'
+async function handleDeleteDigitalHuman(dh: DigitalHuman) {
+  if (!window.confirm(`确认删除角色「${dh.name}」？被该角色驻守的展区会同时撤下。`)) {
     return
   }
-
-  bindingEquipment.value = true
+  deletingDigitalHumanId.value = dh.id
   errorMessage.value = ''
-
   try {
-    await addDigitalHumanEquipment(digitalHuman.value.id, {
-      museumResourceId: Number(equipmentForm.value.museumResourceId),
-      slotCode: equipmentForm.value.slotCode,
-      anchorCode: equipmentForm.value.anchorCode || null,
-    })
-    appStore.showToast('文博资源绑定成功', 'success')
-    equipmentForm.value.museumResourceId = ''
+    await deleteDigitalHumanApi(dh.id)
+    appStore.showToast(`角色「${dh.name}」已删除`, 'success')
+    if (editingDigitalHumanId.value === dh.id) {
+      handleCancelEditDigitalHuman()
+    }
     await fetchExhibitionDetail()
   } catch (error) {
-    errorMessage.value = getErrorMessage(error, '装备绑定失败')
+    errorMessage.value = getErrorMessage(error, '数字人删除失败')
   } finally {
-    bindingEquipment.value = false
+    deletingDigitalHumanId.value = null
   }
 }
 
