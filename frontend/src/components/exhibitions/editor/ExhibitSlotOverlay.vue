@@ -1,7 +1,7 @@
 <template>
   <div class="pointer-events-none absolute inset-0">
     <div
-      v-for="slot in slots"
+      v-for="slot in visibleSlots"
       :key="slot.code"
       class="absolute rounded-lg border-2 border-dashed transition-colors"
       :class="slot.code === activeSlotCode ? 'border-red-700 bg-red-700/10' : 'border-gray-300/50 bg-gray-100/20'"
@@ -14,13 +14,22 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { SlotConfig } from '@/api/types'
 
 const props = defineProps<{
   slots: SlotConfig[]
   zoom: number
   activeSlotCode?: string | null
+  usedSlotCodes?: string[]
 }>()
+
+// 已被展品占用的 slot 不再显示虚线占位框（由 ExhibitOverlay 渲染封面）
+// 但被选中的 slot（activeSlotCode）始终展示，方便编辑视觉定位
+const visibleSlots = computed(() => {
+  const used = new Set(props.usedSlotCodes ?? [])
+  return props.slots.filter(s => !used.has(s.code) || s.code === props.activeSlotCode)
+})
 
 function slotStyle(slot: SlotConfig): Record<string, string> {
   const z = props.zoom

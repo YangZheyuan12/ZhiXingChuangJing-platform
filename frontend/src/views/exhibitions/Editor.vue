@@ -108,15 +108,57 @@
 
           <!-- 组件库 -->
           <template v-else-if="activeLeftTab === 'components'">
-            <div class="space-y-2">
-              <button type="button" class="component-btn" @click="addTextbox">
-                <span class="text-lg">T</span>
-                <span class="text-xs">文本框</span>
-              </button>
-              <button type="button" class="component-btn" @click="addRect">
-                <span class="text-lg">▬</span>
-                <span class="text-xs">面板</span>
-              </button>
+            <div class="space-y-3">
+              <div>
+                <h4 class="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">文本</h4>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" class="component-btn" @click="addTitle">
+                    <span class="component-icon font-serif font-bold">H1</span>
+                    <span class="component-label">大标题</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addSubtitle">
+                    <span class="component-icon font-serif">H2</span>
+                    <span class="component-label">副标题</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addParagraph">
+                    <span class="component-icon">¶</span>
+                    <span class="component-label">正文</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addTextbox">
+                    <span class="component-icon">T</span>
+                    <span class="component-label">文本框</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addQuote">
+                    <span class="component-icon">"</span>
+                    <span class="component-label">引用</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addBadge">
+                    <span class="component-icon">●</span>
+                    <span class="component-label">徽章</span>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <h4 class="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">形状</h4>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" class="component-btn" @click="addRect">
+                    <span class="component-icon">▭</span>
+                    <span class="component-label">矩形</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addCard">
+                    <span class="component-icon">▢</span>
+                    <span class="component-label">卡片</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addCircle">
+                    <span class="component-icon">●</span>
+                    <span class="component-label">圆形</span>
+                  </button>
+                  <button type="button" class="component-btn" @click="addDivider">
+                    <span class="component-icon">―</span>
+                    <span class="component-label">分割线</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -172,13 +214,16 @@
             :background-style="currentZone?.backgroundStyle ?? null"
             :hotspots="currentHotspots"
             :slots="zoneSlots"
+            :exhibits="zoneExhibits"
             :zoom="currentZoom"
             :transitioning="transitioning"
             :active-slot-code="selectedExhibit?.slotCode ?? null"
             :selected-hotspot-id="selectedHotspotId"
+            :selected-exhibit-id="selectedExhibitId"
             :hotspot-draggable="activeRightTab === 'hotspot'"
             @hotspot-select="handleHotspotClick"
             @hotspot-drag-end="handleHotspotDragEnd"
+            @exhibit-select="handleExhibitClick"
           />
         </div>
 
@@ -273,7 +318,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Canvas, Rect, Textbox, FabricImage, Group, type FabricObject } from 'fabric'
+import { Canvas, Circle, Line, Rect, Shadow, Textbox, FabricImage, Group, type FabricObject } from 'fabric'
 import { publishExhibition } from '@/api/modules/exhibitions'
 import { getEditorBundle, saveEditorBundle } from '@/api/modules/editor-bundle'
 import { submitTaskWork } from '@/api/modules/tasks'
@@ -824,6 +869,11 @@ function handleHotspotClick(id: number) {
   activeRightTab.value = 'hotspot'
 }
 
+function handleExhibitClick(id: number) {
+  em.selectExhibit(id)
+  activeRightTab.value = 'exhibit'
+}
+
 async function handleHotspotCreate() {
   const zone = currentZone.value
   if (!zone) {
@@ -1107,39 +1157,141 @@ function handleWheel(e: WheelEvent) {
 //  元素插入
 // ═══════════════════════════════════════════════════════════
 
-function addTextbox() {
+// 统一控件外观 + 控制点可见性配置（让四角拖拽更明显，操作更顺手）
+function applyDefaultControls<T extends FabricObject>(obj: T, opts?: { lockAspect?: boolean }): T {
+  obj.set({
+    cornerSize: 14,
+    cornerColor: '#3b82f6',
+    cornerStrokeColor: '#1d4ed8',
+    cornerStyle: 'circle',
+    transparentCorners: false,
+    borderColor: '#3b82f6',
+    borderScaleFactor: 1.5,
+    padding: 4,
+  })
+  // Textbox 上下中点改 width 无意义，禁用之；其余四角 + 左右保留
+  const visibility: Record<string, boolean> = {
+    tl: true, tr: true, bl: true, br: true,
+    ml: true, mr: true,
+    mt: !(obj instanceof Textbox),
+    mb: !(obj instanceof Textbox),
+    mtr: true,
+  }
+  obj.setControlsVisibility(visibility)
+  if (opts?.lockAspect) {
+    obj.set({ lockUniScaling: true })
+  }
+  return obj
+}
+
+function placeAndActivate(obj: FabricObject) {
   const canvas = fabricCanvas.value
   if (!canvas) return
-  const tb = new Textbox('请输入文本', {
-    left: 200,
-    top: 200,
-    width: 400,
-    fontSize: 28,
-    fontFamily: 'sans-serif',
-    fill: '#1e293b',
-  })
-  canvas.add(tb)
-  canvas.setActiveObject(tb)
+  applyDefaultControls(obj)
+  canvas.add(obj)
+  canvas.setActiveObject(obj)
   canvas.requestRenderAll()
 }
 
+function addTextbox() {
+  placeAndActivate(new Textbox('请输入文本', {
+    left: 200, top: 200, width: 400,
+    fontSize: 28, fontFamily: 'sans-serif', fill: '#1e293b',
+  }))
+}
+
+function addTitle() {
+  placeAndActivate(new Textbox('展厅标题', {
+    left: 160, top: 120, width: 1000,
+    fontSize: 72, fontFamily: 'serif', fontWeight: 'bold',
+    fill: '#0f172a', textAlign: 'center',
+  }))
+}
+
+function addSubtitle() {
+  placeAndActivate(new Textbox('副标题或简短描述', {
+    left: 200, top: 260, width: 800,
+    fontSize: 36, fontFamily: 'sans-serif',
+    fill: '#475569', textAlign: 'center',
+  }))
+}
+
+function addParagraph() {
+  placeAndActivate(new Textbox('在此撰写正文段落，介绍文物背景、历史脉络或学习要点。', {
+    left: 200, top: 320, width: 720,
+    fontSize: 20, fontFamily: 'sans-serif', fill: '#334155',
+    lineHeight: 1.6,
+  }))
+}
+
 function addRect() {
-  const canvas = fabricCanvas.value
-  if (!canvas) return
-  const rect = new Rect({
-    left: 200,
-    top: 200,
-    width: 400,
-    height: 240,
-    rx: 16,
-    ry: 16,
-    fill: '#e2d6cc',
-    stroke: '#c5b9ad',
-    strokeWidth: 1,
+  placeAndActivate(new Rect({
+    left: 200, top: 200, width: 400, height: 240,
+    rx: 16, ry: 16, fill: '#e2d6cc',
+    stroke: '#c5b9ad', strokeWidth: 1,
+  }))
+}
+
+function addCard() {
+  // 一个浅色圆角面板做"卡片"风格容器
+  placeAndActivate(new Rect({
+    left: 200, top: 200, width: 520, height: 320,
+    rx: 20, ry: 20, fill: '#ffffff',
+    stroke: '#e2e8f0', strokeWidth: 2,
+    shadow: new Shadow({ color: 'rgba(15,23,42,0.12)', blur: 24, offsetX: 0, offsetY: 8 }),
+  }))
+}
+
+function addQuote() {
+  // 引用块：左侧色条 + 文字（用 Group 绑定方便整体移动）
+  const bar = new Rect({
+    left: 0, top: 0, width: 8, height: 200,
+    fill: '#f59e0b', stroke: '', strokeWidth: 0,
+    selectable: false, evented: false,
   })
-  canvas.add(rect)
-  canvas.setActiveObject(rect)
-  canvas.requestRenderAll()
+  const text = new Textbox('"在此输入引用内容或重要语录"', {
+    left: 28, top: 12, width: 560,
+    fontSize: 26, fontFamily: 'serif',
+    fill: '#92400e', lineHeight: 1.5,
+    fontStyle: 'italic',
+    selectable: false, evented: false,
+  })
+  const group = new Group([bar, text], { left: 200, top: 200 })
+  placeAndActivate(group)
+}
+
+function addCircle() {
+  placeAndActivate(new Circle({
+    left: 240, top: 240, radius: 120,
+    fill: '#fde68a', stroke: '#f59e0b', strokeWidth: 2,
+  }))
+}
+
+function addDivider() {
+  // 一条水平分割线
+  placeAndActivate(new Line([0, 0, 600, 0], {
+    left: 200, top: 320,
+    stroke: '#94a3b8', strokeWidth: 3,
+    strokeLineCap: 'round',
+  }))
+}
+
+function addBadge() {
+  // 圆角徽章：背景胶囊 Rect + 文字（合并 Group）
+  const pill = new Rect({
+    left: 0, top: 0, width: 180, height: 56,
+    rx: 28, ry: 28, fill: '#dbeafe',
+    stroke: '#2563eb', strokeWidth: 1.5,
+    selectable: false, evented: false,
+  })
+  const label = new Textbox('标签', {
+    left: 0, top: 12, width: 180,
+    fontSize: 22, fontFamily: 'sans-serif',
+    fill: '#1d4ed8', textAlign: 'center', fontWeight: '600',
+    selectable: false, evented: false,
+  })
+  const group = new Group([pill, label], { left: 240, top: 240 })
+  placeAndActivate(group)
 }
 
 async function handleInsertAsset(asset: Asset) {
@@ -1422,6 +1574,12 @@ onBeforeUnmount(() => {
   @apply rounded-md px-2.5 py-1.5 text-base text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300;
 }
 .component-btn {
-  @apply flex w-full items-center gap-3 rounded-md border border-gray-200 px-3 py-2.5 text-left transition hover:border-gray-300 hover:bg-gray-50;
+  @apply flex flex-col items-center justify-center gap-1 rounded-md border border-gray-200 px-2 py-2.5 text-gray-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700;
+}
+.component-icon {
+  @apply text-lg leading-none text-gray-500;
+}
+.component-label {
+  @apply text-[11px] leading-none text-gray-500;
 }
 </style>
