@@ -139,10 +139,6 @@
             />
           </template>
 
-          <!-- 模板 -->
-          <template v-else-if="activeLeftTab === 'templates'">
-            <TemplatePicker @apply="handleApplyTemplate" />
-          </template>
         </div>
       </aside>
 
@@ -221,6 +217,8 @@
             :exhibit="selectedExhibit"
             @update="handleExhibitPropUpdate"
             @ai-narration="handleAiNarration"
+            @add-narration="handleAddNarration"
+            @add-interaction="handleAddInteraction"
           />
         </template>
 
@@ -279,12 +277,14 @@ import { Canvas, Rect, Textbox, FabricImage, Group, type FabricObject } from 'fa
 import { publishExhibition } from '@/api/modules/exhibitions'
 import { getEditorBundle, saveEditorBundle } from '@/api/modules/editor-bundle'
 import { submitTaskWork } from '@/api/modules/tasks'
-import { createZone, deleteZone as deleteZoneApi, getZone } from '@/api/modules/zones'
+import { createZone, deleteZone as deleteZoneApi, getZone, updateZone } from '@/api/modules/zones'
 import {
   createExhibit as createExhibitApi,
   deleteExhibit as deleteExhibitApi,
   getExhibit,
+  updateExhibit,
   upsertExhibitNarration,
+  upsertExhibitInteraction,
 } from '@/api/modules/exhibits'
 import {
   createHotspot as createHotspotApi,
@@ -300,6 +300,8 @@ import type {
   HotspotDetail,
   MuseumResource,
   SlotConfig,
+  UpdateExhibitRequest,
+  UpdateZoneRequest,
   ZoneDetail,
 } from '@/api/types'
 import { getErrorMessage } from '@/utils/request'
@@ -313,7 +315,6 @@ import AssetPicker from '@/components/exhibitions/editor/AssetPicker.vue'
 import LayerPanel from '@/components/exhibitions/editor/LayerPanel.vue'
 import TextStylePanel from '@/components/exhibitions/editor/TextStylePanel.vue'
 import type { LayerItem } from '@/components/exhibitions/editor/LayerPanel.vue'
-import TemplatePicker from '@/components/exhibitions/editor/TemplatePicker.vue'
 import { useAlignmentGuides } from '@/composables/useAlignmentGuides'
 import ZoneNavigator from '@/components/exhibitions/editor/ZoneNavigator.vue'
 import ExhibitList from '@/components/exhibitions/editor/ExhibitList.vue'
@@ -360,15 +361,21 @@ const creatingExhibit = ref(false)
 // ─── 展区切换时保存画布数据的缓存 ───
 const canvasDataCache = new Map<number, Record<string, unknown>>()
 
+// ─── 属性面板 debounce 下发 API 的待决补丁 ───
+const PATCH_DEBOUNCE_MS = 500
+const zonePatchTimers = new Map<number, ReturnType<typeof setTimeout>>()
+const zonePendingPatches = new Map<number, Record<string, unknown>>()
+const exhibitPatchTimers = new Map<number, ReturnType<typeof setTimeout>>()
+const exhibitPendingPatches = new Map<number, Record<string, unknown>>()
+
 // ─── 左侧栏 ───
 const leftTabs = [
   { label: '展区', value: 'zones' as const },
   { label: '组件库', value: 'components' as const },
   { label: '素材库', value: 'assets' as const },
   { label: '图层', value: 'layers' as const },
-  { label: '模板', value: 'templates' as const },
 ]
-const activeLeftTab = ref<'zones' | 'components' | 'assets' | 'layers' | 'templates'>('zones')
+const activeLeftTab = ref<'zones' | 'components' | 'assets' | 'layers'>('zones')
 
 // ─── 右侧栏 ───
 const rightTabs = [
@@ -534,6 +541,11 @@ function handleZoneSwitch(zone: ZoneDetail) {
 
 async function handleZoneSwitchInternal(from: ZoneDetail | null, to: ZoneDetail) {
   transitioning.value = true
+  // 先 flush 自动保存和属性面板待决补丁，避免丢失老展区未存改动
+  await Promise.all([
+    autosave.flush(),
+    flushAllPendingPatches(),
+  ])
   const canvas = fabricCanvas.value
   if (from && canvas) {
     canvasDataCache.set(from.id, (canvas as any).toJSON(CUSTOM_PROPS))
@@ -607,6 +619,15 @@ async function handleDeleteZone(zoneId: number) {
     ? `删除展区「${zone.title}」将同时删除其下 ${exhibitCount} 个展品，确认继续？`
     : `确认删除展区「${zone.title}」？`
   if (!window.confirm(confirmMsg)) return
+  // 删除前 flush，避免已写入 pending 但尚未下发的补丁在删区后才发出去
+  await flushAllPendingPatches()
+  // 丢弃待决展品补丁（反正展品要一起删）
+  for (const ex of allExhibits.value.filter(e => e.zoneId === zoneId)) {
+    exhibitPendingPatches.delete(ex.id)
+    const t = exhibitPatchTimers.get(ex.id)
+    if (t) clearTimeout(t)
+    exhibitPatchTimers.delete(ex.id)
+  }
   try {
     await deleteZoneApi(exhibitionId, zoneId)
     // 移除本地展品
@@ -665,15 +686,74 @@ async function handleDeleteExhibit(id: number) {
 
 function handleZonePropUpdate(field: string, value: unknown) {
   if (!currentZone.value) return
-  zm.updateZoneInList(currentZone.value.id, { [field]: value } as Partial<ZoneDetail>)
+  const zoneId = currentZone.value.id
+  zm.updateZoneInList(zoneId, { [field]: value } as Partial<ZoneDetail>)
   if (field === 'backgroundUrl') {
     currentBackgroundUrl.value = (value as string) ?? null
   }
+  const pending = zonePendingPatches.get(zoneId) ?? {}
+  pending[field] = value
+  zonePendingPatches.set(zoneId, pending)
+  scheduleZonePatch(zoneId)
 }
 
 function handleExhibitPropUpdate(field: string, value: unknown) {
   if (!selectedExhibit.value) return
-  em.updateExhibit(selectedExhibit.value.id, { [field]: value } as Partial<ExhibitDetail>)
+  const exhibitId = selectedExhibit.value.id
+  em.updateExhibit(exhibitId, { [field]: value } as Partial<ExhibitDetail>)
+  const pending = exhibitPendingPatches.get(exhibitId) ?? {}
+  pending[field] = value
+  exhibitPendingPatches.set(exhibitId, pending)
+  scheduleExhibitPatch(exhibitId)
+}
+
+function scheduleZonePatch(zoneId: number) {
+  const existing = zonePatchTimers.get(zoneId)
+  if (existing) clearTimeout(existing)
+  zonePatchTimers.set(zoneId, setTimeout(() => { void flushZonePatch(zoneId) }, PATCH_DEBOUNCE_MS))
+}
+
+function scheduleExhibitPatch(exhibitId: number) {
+  const existing = exhibitPatchTimers.get(exhibitId)
+  if (existing) clearTimeout(existing)
+  exhibitPatchTimers.set(exhibitId, setTimeout(() => { void flushExhibitPatch(exhibitId) }, PATCH_DEBOUNCE_MS))
+}
+
+async function flushZonePatch(zoneId: number) {
+  const patch = zonePendingPatches.get(zoneId)
+  zonePendingPatches.delete(zoneId)
+  const timer = zonePatchTimers.get(zoneId)
+  if (timer) clearTimeout(timer)
+  zonePatchTimers.delete(zoneId)
+  if (!patch || Object.keys(patch).length === 0) return
+  try {
+    await updateZone(exhibitionId, zoneId, patch as UpdateZoneRequest)
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '展区更新失败'), 'error')
+  }
+}
+
+async function flushExhibitPatch(exhibitId: number) {
+  const patch = exhibitPendingPatches.get(exhibitId)
+  exhibitPendingPatches.delete(exhibitId)
+  const timer = exhibitPatchTimers.get(exhibitId)
+  if (timer) clearTimeout(timer)
+  exhibitPatchTimers.delete(exhibitId)
+  if (!patch || Object.keys(patch).length === 0) return
+  try {
+    await updateExhibit(exhibitionId, exhibitId, patch as UpdateExhibitRequest)
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '展品更新失败'), 'error')
+  }
+}
+
+async function flushAllPendingPatches() {
+  const zoneIds = [...zonePendingPatches.keys()]
+  const exhibitIds = [...exhibitPendingPatches.keys()]
+  await Promise.all([
+    ...zoneIds.map(id => flushZonePatch(id)),
+    ...exhibitIds.map(id => flushExhibitPatch(id)),
+  ])
 }
 
 async function handleAiNarration(narration: string, _suggestions: string[]) {
@@ -697,6 +777,44 @@ async function handleAiNarration(narration: string, _suggestions: string[]) {
   void _suggestions
 }
 
+async function handleAddNarration() {
+  const current = selectedExhibit.value
+  if (!current) return
+  const content = window.prompt('请输入讲解词内容：', '')
+  if (!content || !content.trim()) return
+  try {
+    await upsertExhibitNarration(exhibitionId, current.id, {
+      content: content.trim(),
+      narrationType: 'text',
+      sortOrder: current.narrations.length,
+    })
+    const refreshed = await getExhibit(exhibitionId, current.id)
+    em.updateExhibit(current.id, { narrations: refreshed.narrations })
+    appStore.showToast('讲解词已添加', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '讲解词添加失败'), 'error')
+  }
+}
+
+async function handleAddInteraction() {
+  const current = selectedExhibit.value
+  if (!current) return
+  const questionText = window.prompt('请输入互动题目：', '')
+  if (!questionText || !questionText.trim()) return
+  try {
+    await upsertExhibitInteraction(exhibitionId, current.id, {
+      interactionType: 'open_question',
+      questionText: questionText.trim(),
+      sortOrder: current.interactions.length,
+    })
+    const refreshed = await getExhibit(exhibitionId, current.id)
+    em.updateExhibit(current.id, { interactions: refreshed.interactions })
+    appStore.showToast('互动题已添加', 'success')
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '互动题添加失败'), 'error')
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 //  热点操作（CRUD）
 // ═══════════════════════════════════════════════════════════
@@ -717,9 +835,9 @@ async function handleHotspotCreate() {
   try {
     const existingCount = currentHotspots.value.length
     const created = await createHotspotApi(exhibitionId, zone.id, {
-      hotspotType: 'info',
+      hotspotType: 'navigation',
       label: '新热点',
-      icon: 'i',
+      icon: 'arrow-right',
       xPercent: 50,
       yPercent: 50,
       wPercent: 6,
@@ -986,61 +1104,6 @@ function handleWheel(e: WheelEvent) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  组件模板
-// ═══════════════════════════════════════════════════════════
-
-function handleApplyTemplate(templateId: string) {
-  const canvas = fabricCanvas.value
-  if (!canvas) return
-  const W = LOGICAL_WIDTH
-  const H = LOGICAL_HEIGHT
-
-  const templates: Record<string, () => void> = {
-    'title-page': () => {
-      canvas.add(new Rect({ left: 0, top: 0, width: W, height: H, fill: '#1e293b', selectable: false }))
-      canvas.add(new Textbox('展厅标题', { left: W / 2 - 300, top: H * 0.32, width: 600, fontSize: 72, fontFamily: 'serif', fill: '#ffffff', textAlign: 'center' }))
-      canvas.add(new Textbox('副标题或简介文字', { left: W / 2 - 250, top: H * 0.52, width: 500, fontSize: 28, fontFamily: 'sans-serif', fill: '#94a3b8', textAlign: 'center' }))
-    },
-    'image-text': () => {
-      canvas.add(new Rect({ left: 60, top: 120, width: 800, height: 600, rx: 20, ry: 20, fill: '#e2d6cc', stroke: '#c5b9ad', strokeWidth: 1 }))
-      canvas.add(new Textbox('在此添加标题', { left: 940, top: 180, width: 860, fontSize: 36, fontFamily: 'serif', fill: '#1e293b' }))
-      canvas.add(new Textbox('在此添加段落内容，描述图片或文物的背景故事。', { left: 940, top: 260, width: 860, fontSize: 20, fontFamily: 'sans-serif', fill: '#64748b', lineHeight: 1.6 }))
-    },
-    'dual-panel': () => {
-      canvas.add(new Rect({ left: 60, top: 120, width: 880, height: 700, rx: 20, ry: 20, fill: '#f1ebe5', stroke: '#d6cec6', strokeWidth: 1 }))
-      canvas.add(new Rect({ left: 980, top: 120, width: 880, height: 700, rx: 20, ry: 20, fill: '#f1ebe5', stroke: '#d6cec6', strokeWidth: 1 }))
-      canvas.add(new Textbox('左侧面板标题', { left: 120, top: 200, width: 760, fontSize: 28, fontFamily: 'serif', fill: '#1e293b', textAlign: 'center' }))
-      canvas.add(new Textbox('右侧面板标题', { left: 1040, top: 200, width: 760, fontSize: 28, fontFamily: 'serif', fill: '#1e293b', textAlign: 'center' }))
-    },
-    'quote-block': () => {
-      canvas.add(new Rect({ left: 200, top: 200, width: W - 400, height: 500, rx: 24, ry: 24, fill: '#fef3c7', stroke: '#fcd34d', strokeWidth: 2 }))
-      canvas.add(new Textbox('"', { left: 240, top: 220, width: 100, fontSize: 120, fontFamily: 'serif', fill: '#d97706' }))
-      canvas.add(new Textbox('在此输入引用的名言或重要文段', { left: 300, top: 340, width: W - 600, fontSize: 32, fontFamily: 'serif', fill: '#92400e', lineHeight: 1.5 }))
-      canvas.add(new Textbox('— 出处', { left: 300, top: 540, width: W - 600, fontSize: 20, fontFamily: 'sans-serif', fill: '#b45309', textAlign: 'right' }))
-    },
-    'gallery-grid': () => {
-      const gw = 560; const gh = 380; const gap = 40
-      const startX = (W - gw * 2 - gap) / 2; const startY = (H - gh * 2 - gap) / 2
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < 2; col++) {
-          canvas.add(new Rect({
-            left: startX + col * (gw + gap),
-            top: startY + row * (gh + gap),
-            width: gw, height: gh, rx: 16, ry: 16, fill: '#e2d6cc', stroke: '#c5b9ad', strokeWidth: 1,
-          }))
-        }
-      }
-    },
-  }
-
-  const apply = templates[templateId]
-  if (apply) {
-    apply()
-    canvas.requestRenderAll()
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
 //  元素插入
 // ═══════════════════════════════════════════════════════════
 
@@ -1216,6 +1279,8 @@ function buildCanvasDataMap(): Record<string, Record<string, unknown>> {
 async function handleSave() {
   saving.value = true
   try {
+    // 先 flush 属性面板待决补丁，确保保存前所有属性已下发
+    await flushAllPendingPatches()
     const canvasDataMap = buildCanvasDataMap()
     const result = await saveEditorBundle(exhibitionId, {
       revision: bundleRevision.value,
@@ -1268,8 +1333,11 @@ async function handleSubmitForReview(remark: string) {
   }
   submittingForReview.value = true
   try {
-    // 先 flush 自动保存的草稿，再调用提交（基于 latestVersionNo）
-    await autosave.flush()
+    // 先 flush 自动保存和属性面板补丁，再调用提交
+    await Promise.all([
+      autosave.flush(),
+      flushAllPendingPatches(),
+    ])
     await submitTaskWork(taskId, {
       exhibitionId,
       submitRemark: remark || null,
@@ -1337,6 +1405,8 @@ function refreshLayers() {
 }
 
 onBeforeUnmount(() => {
+  // 离页前 flush 所有待决补丁（best-effort，不阻塞）
+  void flushAllPendingPatches()
   canvasWrapper.value?.removeEventListener('wheel', handleWheel)
   alignGuides.unbind()
   shortcuts.unbind()
