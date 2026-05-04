@@ -103,16 +103,69 @@
               />
             </label>
 
-            <label class="block">
-              <span class="text-sm font-medium text-slate-700">媒体 URL <span class="text-slate-400">（选填）</span></span>
+            <div>
+              <span class="text-sm font-medium text-slate-700">
+                媒体文件 <span class="text-slate-400">（{{ mediaHint }}，选填）</span>
+              </span>
+              <div class="mt-1.5 flex items-stretch gap-1.5">
+                <input
+                  v-model="form.mediaUrl"
+                  type="text"
+                  :disabled="submitting || mediaUploading"
+                  class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  placeholder="https://... 或点击右侧上传"
+                />
+                <button
+                  type="button"
+                  :disabled="submitting || mediaUploading"
+                  class="shrink-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-50"
+                  @click="triggerMediaUpload"
+                >{{ mediaUploading ? '上传中…' : '上传' }}</button>
+              </div>
               <input
-                v-model="form.mediaUrl"
-                type="text"
-                :disabled="submitting"
-                class="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                placeholder="https://..."
+                ref="mediaFileInputRef"
+                type="file"
+                :accept="mediaAccept"
+                class="hidden"
+                @change="handleMediaFileChange"
               />
-            </label>
+              <div v-if="form.mediaUrl && form.exhibitType === 'image'" class="mt-2 overflow-hidden rounded-md border border-slate-100">
+                <img :src="form.mediaUrl" class="h-24 w-full object-cover" alt="媒体预览" />
+              </div>
+              <p v-if="mediaUploadError" class="mt-1 text-xs text-rose-500">{{ mediaUploadError }}</p>
+            </div>
+
+            <div v-if="form.exhibitType !== 'image' && form.exhibitType !== 'text'">
+              <span class="text-sm font-medium text-slate-700">
+                封面图 <span class="text-slate-400">（选填，仅作为画布预览）</span>
+              </span>
+              <div class="mt-1.5 flex items-stretch gap-1.5">
+                <input
+                  v-model="form.coverUrl"
+                  type="text"
+                  :disabled="submitting || coverUploading"
+                  class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  placeholder="https://... 或点击右侧上传图片"
+                />
+                <button
+                  type="button"
+                  :disabled="submitting || coverUploading"
+                  class="shrink-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-50"
+                  @click="triggerCoverUpload"
+                >{{ coverUploading ? '上传中…' : '上传' }}</button>
+              </div>
+              <input
+                ref="coverFileInputRef"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="handleCoverFileChange"
+              />
+              <div v-if="form.coverUrl" class="mt-2 overflow-hidden rounded-md border border-slate-100">
+                <img :src="form.coverUrl" class="h-20 w-full object-cover" alt="封面预览" />
+              </div>
+              <p v-if="coverUploadError" class="mt-1 text-xs text-rose-500">{{ coverUploadError }}</p>
+            </div>
 
             <label class="block">
               <span class="text-sm font-medium text-slate-700">简介 <span class="text-slate-400">（选填）</span></span>
@@ -151,8 +204,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { CreateExhibitRequest, SlotConfig } from '@/api/types'
+import { uploadAsset } from '@/api/modules/assets'
+import { getErrorMessage } from '@/utils/request'
 
 const props = defineProps<{
   visible: boolean
@@ -174,8 +229,91 @@ const form = reactive({
   placementMode: 'freeform',
   slotCode: null as string | null,
   mediaUrl: '',
+  coverUrl: '',
+  mediaAssetId: null as number | null,
   description: '',
 })
+
+const mediaFileInputRef = ref<HTMLInputElement | null>(null)
+const coverFileInputRef = ref<HTMLInputElement | null>(null)
+const mediaUploading = ref(false)
+const coverUploading = ref(false)
+const mediaUploadError = ref('')
+const coverUploadError = ref('')
+
+const mediaAccept = computed(() => {
+  switch (form.exhibitType) {
+    case 'image': return 'image/*'
+    case 'video': return 'video/*'
+    case 'audio': return 'audio/*'
+    case 'document': return '.pdf,.doc,.docx,.txt,.md'
+    case 'model': return '.glb,.gltf,.obj,.fbx'
+    default: return '*/*'
+  }
+})
+
+const mediaHint = computed(() => {
+  switch (form.exhibitType) {
+    case 'image': return '图片将同时作为封面'
+    case 'video': return '视频文件'
+    case 'audio': return '音频文件'
+    case 'document': return 'PDF/Word/文本'
+    case 'model': return 'GLTF/GLB/OBJ'
+    case 'text': return '不需上传文件'
+    default: return '选填'
+  }
+})
+
+function triggerMediaUpload() {
+  mediaUploadError.value = ''
+  mediaFileInputRef.value?.click()
+}
+
+async function handleMediaFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  mediaUploading.value = true
+  mediaUploadError.value = ''
+  try {
+    const data = await uploadAsset(file, { bizType: 'exhibit-media' })
+    if (data.fileUrl) form.mediaUrl = data.fileUrl
+    if (data.assetId) form.mediaAssetId = data.assetId
+    // 图片类型同步到 coverUrl，避免用户重复上传
+    if (form.exhibitType === 'image' && data.fileUrl) form.coverUrl = data.fileUrl
+  } catch (err) {
+    mediaUploadError.value = getErrorMessage(err, '上传失败')
+  } finally {
+    mediaUploading.value = false
+  }
+}
+
+function triggerCoverUpload() {
+  coverUploadError.value = ''
+  coverFileInputRef.value?.click()
+}
+
+async function handleCoverFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    coverUploadError.value = '请选择图片文件'
+    return
+  }
+  coverUploading.value = true
+  coverUploadError.value = ''
+  try {
+    const data = await uploadAsset(file, { bizType: 'exhibit-cover' })
+    if (data.fileUrl) form.coverUrl = data.fileUrl
+  } catch (err) {
+    coverUploadError.value = getErrorMessage(err, '上传失败')
+  } finally {
+    coverUploading.value = false
+  }
+}
 
 watch(
   () => props.visible,
@@ -187,7 +325,11 @@ watch(
       form.placementMode = (props.availableSlots?.length ?? 0) > 0 ? 'slot' : 'freeform'
       form.slotCode = null
       form.mediaUrl = ''
+      form.coverUrl = ''
+      form.mediaAssetId = null
       form.description = ''
+      mediaUploadError.value = ''
+      coverUploadError.value = ''
     }
   },
 )
@@ -210,6 +352,8 @@ function handleSubmit() {
     placementMode: form.placementMode,
     slotCode: form.placementMode === 'slot' ? form.slotCode : null,
     mediaUrl: form.mediaUrl.trim() || null,
+    coverUrl: form.coverUrl.trim() || null,
+    mediaAssetId: form.mediaAssetId,
     description: form.description.trim() || null,
   })
 }

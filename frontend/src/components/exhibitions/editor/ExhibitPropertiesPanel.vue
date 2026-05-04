@@ -46,23 +46,60 @@
       />
     </label>
 
-    <label class="block">
-      <span class="mb-1 block text-xs font-medium text-gray-600">封面 URL</span>
+    <div>
+      <span class="mb-1 block text-xs font-medium text-gray-600">封面图</span>
+      <div class="flex items-stretch gap-1.5">
+        <input
+          :value="exhibit.coverUrl ?? ''"
+          class="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm"
+          placeholder="输入 URL 或上传图片"
+          @change="emitUpdate('coverUrl', ($event.target as HTMLInputElement).value || null)"
+        />
+        <button
+          type="button"
+          :disabled="coverUploading"
+          class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-50"
+          @click="triggerCoverUpload"
+        >{{ coverUploading ? '上传中…' : '上传' }}</button>
+      </div>
       <input
-        :value="exhibit.coverUrl ?? ''"
-        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm"
-        @change="emitUpdate('coverUrl', ($event.target as HTMLInputElement).value || null)"
+        ref="coverFileInputRef"
+        type="file"
+        accept="image/*"
+        class="hidden"
+        @change="handleCoverFileChange"
       />
-    </label>
+      <div v-if="exhibit.coverUrl" class="mt-2 overflow-hidden rounded-md border border-gray-100 bg-slate-50">
+        <img :src="exhibit.coverUrl" class="h-20 w-full object-cover" alt="封面预览" />
+      </div>
+      <p v-if="coverUploadError" class="mt-1 text-xs text-rose-500">{{ coverUploadError }}</p>
+    </div>
 
-    <label class="block">
-      <span class="mb-1 block text-xs font-medium text-gray-600">媒体 URL</span>
+    <div>
+      <span class="mb-1 block text-xs font-medium text-gray-600">媒体文件</span>
+      <div class="flex items-stretch gap-1.5">
+        <input
+          :value="exhibit.mediaUrl ?? ''"
+          class="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm"
+          placeholder="输入 URL 或上传文件"
+          @change="emitUpdate('mediaUrl', ($event.target as HTMLInputElement).value || null)"
+        />
+        <button
+          type="button"
+          :disabled="mediaUploading"
+          class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:opacity-50"
+          @click="triggerMediaUpload"
+        >{{ mediaUploading ? '上传中…' : '上传' }}</button>
+      </div>
       <input
-        :value="exhibit.mediaUrl ?? ''"
-        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm"
-        @change="emitUpdate('mediaUrl', ($event.target as HTMLInputElement).value || null)"
+        ref="mediaFileInputRef"
+        type="file"
+        :accept="mediaAccept"
+        class="hidden"
+        @change="handleMediaFileChange"
       />
-    </label>
+      <p v-if="mediaUploadError" class="mt-1 text-xs text-rose-500">{{ mediaUploadError }}</p>
+    </div>
 
     <div>
       <div class="mb-2 flex items-center justify-between">
@@ -111,11 +148,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { ExhibitDetail } from '@/api/types'
 import NarrationGeneratorModal from './NarrationGeneratorModal.vue'
+import { uploadAsset } from '@/api/modules/assets'
+import { getErrorMessage } from '@/utils/request'
 
-defineProps<{
+const props = defineProps<{
   exhibit: ExhibitDetail | null
 }>()
 
@@ -128,11 +167,83 @@ const emit = defineEmits<{
 
 const aiModalVisible = ref(false)
 
+const coverFileInputRef = ref<HTMLInputElement | null>(null)
+const mediaFileInputRef = ref<HTMLInputElement | null>(null)
+const coverUploading = ref(false)
+const mediaUploading = ref(false)
+const coverUploadError = ref('')
+const mediaUploadError = ref('')
+
+const mediaAccept = computed(() => {
+  switch (props.exhibit?.exhibitType) {
+    case 'image': return 'image/*'
+    case 'video': return 'video/*'
+    case 'audio': return 'audio/*'
+    case 'document': return '.pdf,.doc,.docx,.txt,.md'
+    case 'model': return '.glb,.gltf,.obj,.fbx'
+    default: return '*/*'
+  }
+})
+
 function emitUpdate(field: string, value: unknown) {
   emit('update', field, value)
 }
 
 function handleUseAiNarration(narration: string, suggestions: string[]) {
   emit('ai-narration', narration, suggestions)
+}
+
+function triggerCoverUpload() {
+  coverUploadError.value = ''
+  coverFileInputRef.value?.click()
+}
+
+async function handleCoverFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    coverUploadError.value = '请选择图片文件'
+    return
+  }
+  coverUploading.value = true
+  coverUploadError.value = ''
+  try {
+    const data = await uploadAsset(file, { bizType: 'exhibit-cover' })
+    if (data.fileUrl) emit('update', 'coverUrl', data.fileUrl)
+  } catch (err) {
+    coverUploadError.value = getErrorMessage(err, '上传失败')
+  } finally {
+    coverUploading.value = false
+  }
+}
+
+function triggerMediaUpload() {
+  mediaUploadError.value = ''
+  mediaFileInputRef.value?.click()
+}
+
+async function handleMediaFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  mediaUploading.value = true
+  mediaUploadError.value = ''
+  try {
+    const data = await uploadAsset(file, { bizType: 'exhibit-media' })
+    if (data.fileUrl) {
+      emit('update', 'mediaUrl', data.fileUrl)
+      // 图片类型同步到 coverUrl
+      if (props.exhibit?.exhibitType === 'image') {
+        emit('update', 'coverUrl', data.fileUrl)
+      }
+    }
+  } catch (err) {
+    mediaUploadError.value = getErrorMessage(err, '上传失败')
+  } finally {
+    mediaUploading.value = false
+  }
 }
 </script>
