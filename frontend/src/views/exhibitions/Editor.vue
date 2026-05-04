@@ -224,6 +224,7 @@
             @hotspot-select="handleHotspotClick"
             @hotspot-drag-end="handleHotspotDragEnd"
             @exhibit-select="handleExhibitClick"
+            @exhibit-placement="handleExhibitPlacementUpdate"
           />
         </div>
 
@@ -306,6 +307,17 @@
                   @update="handleTextStyleUpdate"
                 />
               </div>
+
+              <div class="border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  class="w-full rounded-lg border border-rose-200 bg-rose-50 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-100"
+                  title="删除选中元素（快捷键 Del）"
+                  @click="handleDeleteSelected"
+                >
+                  删除元素
+                </button>
+              </div>
             </div>
           </template>
           <p v-else class="text-xs text-gray-400">选中画布元素后可编辑属性。</p>
@@ -316,7 +328,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, toRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, toRef, triggerRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Canvas, Circle, Line, Rect, Shadow, Textbox, FabricImage, Group, type FabricObject } from 'fabric'
 import { publishExhibition } from '@/api/modules/exhibitions'
@@ -874,6 +886,33 @@ function handleExhibitClick(id: number) {
   activeRightTab.value = 'exhibit'
 }
 
+async function handleExhibitPlacementUpdate(
+  id: number,
+  placement: { x: number; y: number; w: number; h: number },
+) {
+  const ex = allExhibits.value.find(e => e.id === id)
+  if (!ex) return
+  const nextPlacementJson = { ...placement }
+  // 乐观更新：slot 模式被拖动自动转 freeform
+  em.updateExhibit(id, {
+    placementMode: 'freeform',
+    placementJson: nextPlacementJson,
+  } as Partial<ExhibitDetail>)
+  try {
+    await updateExhibit(exhibitionId, id, {
+      placementMode: 'freeform',
+      placementJson: nextPlacementJson,
+    })
+  } catch (error) {
+    appStore.showToast(getErrorMessage(error, '位置保存失败'), 'error')
+    // 回滚
+    em.updateExhibit(id, {
+      placementMode: ex.placementMode,
+      placementJson: ex.placementJson,
+    } as Partial<ExhibitDetail>)
+  }
+}
+
 async function handleHotspotCreate() {
   const zone = currentZone.value
   if (!zone) {
@@ -1116,8 +1155,32 @@ function handleTextStyleUpdate(prop: string, value: unknown) {
   const canvas = fabricCanvas.value
   if (!obj || !canvas || obj.type !== 'textbox') return
   obj.set(prop as keyof typeof obj, value)
+  // 改字号后需重新测量 Textbox 排版，否则边界框不更新
+  if (prop === 'fontSize' || prop === 'fontFamily' || prop === 'fontWeight') {
+    (obj as any).initDimensions?.()
+  }
   canvas.requestRenderAll()
+  // selectedObject 是 shallowRef，对内部字段变化不响应，手动触发 textStyle computed 重算
+  triggerRef(selectedObject)
+  // 进历史栈，与其他 modified 操作一致
+  canvas.fire('object:modified', { target: obj })
   syncSelectedProps()
+}
+
+function handleDeleteSelected() {
+  const obj = selectedObject.value
+  const canvas = fabricCanvas.value
+  if (!obj || !canvas) return
+  // 支持多选
+  const active = canvas.getActiveObjects()
+  if (active.length > 0) {
+    active.forEach(o => canvas.remove(o))
+  } else {
+    canvas.remove(obj)
+  }
+  canvas.discardActiveObject()
+  canvas.requestRenderAll()
+  selectedObject.value = null
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1169,15 +1232,12 @@ function applyDefaultControls<T extends FabricObject>(obj: T, opts?: { lockAspec
     borderScaleFactor: 1.5,
     padding: 4,
   })
-  // Textbox 上下中点改 width 无意义，禁用之；其余四角 + 左右保留
-  const visibility: Record<string, boolean> = {
+  // 所有控制点全开（包括 Textbox 的上下中点便于用户拖拽调整宽高）
+  obj.setControlsVisibility({
     tl: true, tr: true, bl: true, br: true,
-    ml: true, mr: true,
-    mt: !(obj instanceof Textbox),
-    mb: !(obj instanceof Textbox),
+    ml: true, mr: true, mt: true, mb: true,
     mtr: true,
-  }
-  obj.setControlsVisibility(visibility)
+  })
   if (opts?.lockAspect) {
     obj.set({ lockUniScaling: true })
   }

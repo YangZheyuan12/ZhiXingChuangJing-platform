@@ -55,7 +55,35 @@ const positionStyle = computed(() => {
   }
 })
 
+// 预设图标名到符号的映射（与 HotspotPropertiesPanel 的 icon 字段联动）
+const ICON_SYMBOLS: Record<string, string> = {
+  'arrow-right': '→',
+  'arrow-left': '←',
+  'arrow-up': '↑',
+  'arrow-down': '↓',
+  'chevron-right': '›',
+  'chevron-left': '‹',
+  info: 'ℹ',
+  'info-circle': 'ℹ',
+  link: '🔗',
+  image: '🖼',
+  picture: '🖼',
+  mic: '🎙',
+  home: '⌂',
+  close: '✕',
+  plus: '+',
+  play: '▶',
+  pause: '⏸',
+  star: '★',
+}
+
 const iconText = computed(() => {
+  // 优先读用户配置的 icon 字段（支持预设名或直接符号）
+  const configured = props.hotspot.icon?.trim()
+  if (configured) {
+    return ICON_SYMBOLS[configured] ?? configured
+  }
+  // 回退到热点类型默认图标
   const icons: Record<string, string> = {
     navigation: '→',
     exhibit_popup: '🖼',

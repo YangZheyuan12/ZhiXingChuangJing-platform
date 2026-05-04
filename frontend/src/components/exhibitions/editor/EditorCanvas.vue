@@ -24,6 +24,7 @@
       :zoom="zoom"
       :selected-exhibit-id="selectedExhibitId"
       @select="(id) => emit('exhibit-select', id)"
+      @update-placement="(id, p) => emit('exhibit-placement', id, p)"
     />
     <HotspotOverlay
       class="z-30"
@@ -63,6 +64,7 @@ const emit = defineEmits<{
   'hotspot-select': [id: number]
   'hotspot-drag-end': [id: number, xPercent: number, yPercent: number]
   'exhibit-select': [id: number]
+  'exhibit-placement': [id: number, placement: { x: number; y: number; w: number; h: number }]
 }>()
 
 const usedSlotCodes = computed(() =>
