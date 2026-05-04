@@ -38,13 +38,17 @@ public class CommunityController extends BaseController {
             @RequestParam(required = false) String tag,
             @RequestParam(required = false) String sortBy,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer pageSize) {
-        return success(communityService.getCommunityExhibitions(keyword, grade, theme, tag, sortBy, page, pageSize));
+            @RequestParam(required = false) Integer pageSize,
+            @AuthenticationPrincipal SecurityUserDetails currentUser) {
+        return success(communityService.getCommunityExhibitions(keyword, grade, theme, tag, sortBy, page, pageSize,
+                currentUser != null ? currentUser.getId() : null));
     }
 
     @GetMapping("/{exhibitionId}")
-    public ApiResponse<ExhibitionResponses.ExhibitionViewerDataResponse> getCommunityExhibitionDetail(@PathVariable Long exhibitionId) {
-        return success(communityService.getCommunityExhibitionDetail(exhibitionId));
+    public ApiResponse<ExhibitionResponses.ExhibitionViewerDataResponse> getCommunityExhibitionDetail(
+            @PathVariable Long exhibitionId,
+            @AuthenticationPrincipal SecurityUserDetails currentUser) {
+        return success(communityService.getCommunityExhibitionDetail(exhibitionId, currentUser.getId()));
     }
 
     @GetMapping("/{exhibitionId}/comments")

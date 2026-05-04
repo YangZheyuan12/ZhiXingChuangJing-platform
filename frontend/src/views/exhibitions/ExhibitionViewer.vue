@@ -220,16 +220,6 @@ const likeCount = computed(() => viewer.value?.exhibition.stats?.likeCount ?? 0)
 const favoriteCount = computed(() => viewer.value?.exhibition.stats?.favoriteCount ?? 0)
 const commentCount = computed(() => viewer.value?.exhibition.stats?.commentCount ?? 0)
 
-function buildInteractionKey(type: 'like' | 'favorite') {
-  return `zxcyj-viewer-${type}-${authStore.user?.id || 'guest'}-${exhibitionId}`
-}
-function readInteractionState(type: 'like' | 'favorite') {
-  return localStorage.getItem(buildInteractionKey(type)) === '1'
-}
-function writeInteractionState(type: 'like' | 'favorite', value: boolean) {
-  localStorage.setItem(buildInteractionKey(type), value ? '1' : '0')
-}
-
 // ─── 展区管理 ───
 const zones = computed<ZoneDetail[]>(() => bundle.value?.zones ?? [])
 const currentZoneIndex = ref(0)
@@ -287,8 +277,8 @@ async function loadData() {
     ])
     bundle.value = bundleData
     viewer.value = viewerData
-    liked.value = readInteractionState('like')
-    favorited.value = readInteractionState('favorite')
+    liked.value = viewerData?.currentUserLiked ?? false
+    favorited.value = viewerData?.currentUserFavorited ?? false
   } catch (e) {
     errorMessage.value = getErrorMessage(e, '展厅加载失败')
   } finally {
@@ -308,7 +298,6 @@ async function toggleLike() {
   }
   const nextLiked = !liked.value
   liked.value = nextLiked
-  writeInteractionState('like', nextLiked)
   // 乐观更新计数
   if (viewer.value.exhibition.stats) {
     viewer.value.exhibition.stats.likeCount = Math.max(
@@ -326,7 +315,6 @@ async function toggleLike() {
   } catch (error) {
     // 回滚
     liked.value = !nextLiked
-    writeInteractionState('like', liked.value)
     if (viewer.value.exhibition.stats) {
       viewer.value.exhibition.stats.likeCount = Math.max(
         0,
@@ -347,7 +335,6 @@ async function toggleFavorite() {
   }
   const nextFavorited = !favorited.value
   favorited.value = nextFavorited
-  writeInteractionState('favorite', nextFavorited)
   if (viewer.value.exhibition.stats) {
     viewer.value.exhibition.stats.favoriteCount = Math.max(
       0,
@@ -363,7 +350,6 @@ async function toggleFavorite() {
     }
   } catch (error) {
     favorited.value = !nextFavorited
-    writeInteractionState('favorite', favorited.value)
     if (viewer.value.exhibition.stats) {
       viewer.value.exhibition.stats.favoriteCount = Math.max(
         0,

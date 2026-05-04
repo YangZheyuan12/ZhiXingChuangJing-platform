@@ -34,8 +34,16 @@ public final class ExhibitionResponses {
             List<String> tags,
             String workflowStatus,
             String visibilityScope,
-            Boolean isFeatured
+            Boolean isFeatured,
+            Boolean currentUserLiked
     ) {
+        public ExhibitionSummaryResponse withCurrentUserLiked(boolean liked) {
+            return new ExhibitionSummaryResponse(
+                    id, taskId, title, coverUrl, summary, status, visibility, groupName,
+                    ownerId, author, latestVersionNo, publishedVersionNo, stats, tags,
+                    workflowStatus, visibilityScope, isFeatured, liked
+            );
+        }
     }
 
     public record ExhibitionMemberResponse(
@@ -151,7 +159,9 @@ public final class ExhibitionResponses {
             ExhibitionRenderDataResponse renderData,
             DigitalHumanResponse digitalHuman,
             List<SubmissionReviewResponse> teacherReviews,
-            List<CommunityResponses.CommentResponse> comments
+            List<CommunityResponses.CommentResponse> comments,
+            boolean currentUserLiked,
+            boolean currentUserFavorited
     ) {
     }
 

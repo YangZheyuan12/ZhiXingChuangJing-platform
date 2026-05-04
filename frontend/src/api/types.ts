@@ -203,6 +203,7 @@ export interface CommunityExhibition {
   publishedVersionNo: number
   stats: ExhibitionStats
   tags: string[]
+  currentUserLiked?: boolean | null
 }
 
 export type CommunityExhibitionSortBy = 'latest' | 'hot' | 'likes'
@@ -511,6 +512,8 @@ export interface ExhibitionViewerData {
   digitalHuman?: DigitalHuman | null
   teacherReviews: SubmissionReview[]
   comments: Comment[]
+  currentUserLiked: boolean
+  currentUserFavorited: boolean
 }
 
 export interface CommunityComments {

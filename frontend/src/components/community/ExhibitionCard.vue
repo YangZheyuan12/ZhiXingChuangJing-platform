@@ -71,7 +71,6 @@
 import { computed, ref, watch } from 'vue'
 import type { CommunityExhibition } from '@/api/types'
 import { likeCommunityExhibition, unlikeCommunityExhibition } from '@/api/modules/community'
-import { useAuthStore } from '@/stores/auth'
 import { getErrorMessage } from '@/utils/request'
 
 const props = defineProps<{
@@ -82,8 +81,7 @@ const emit = defineEmits<{
   likeError: [message: string]
 }>()
 
-const authStore = useAuthStore()
-const localLiked = ref(false)
+const localLiked = ref(props.exhibition.currentUserLiked === true)
 const likePending = ref(false)
 const localLikeCount = ref(props.exhibition.stats.likeCount)
 
@@ -91,13 +89,12 @@ const coverUrl = computed(() => props.exhibition.coverUrl?.trim() || '')
 const detailLink = computed(() => `/community/${props.exhibition.id}`)
 
 watch(
-  () => [props.exhibition.id, props.exhibition.stats.likeCount] as const,
-  ([, likeCount]) => {
-    localLiked.value = readLikeState()
+  () => [props.exhibition.id, props.exhibition.stats.likeCount, props.exhibition.currentUserLiked] as const,
+  ([, likeCount, liked]) => {
+    localLiked.value = liked === true
     localLikeCount.value = likeCount
     likePending.value = false
   },
-  { immediate: true },
 )
 
 async function handleLike(event: MouseEvent) {
@@ -110,7 +107,6 @@ async function handleLike(event: MouseEvent) {
 
   const nextLiked = !localLiked.value
   localLiked.value = nextLiked
-  writeLikeState(nextLiked)
   localLikeCount.value = Math.max(0, localLikeCount.value + (nextLiked ? 1 : -1))
   likePending.value = true
 
@@ -123,7 +119,6 @@ async function handleLike(event: MouseEvent) {
     await unlikeCommunityExhibition(props.exhibition.id)
   } catch (error) {
     localLiked.value = !nextLiked
-    writeLikeState(localLiked.value)
     localLikeCount.value = Math.max(0, localLikeCount.value + (nextLiked ? -1 : 1))
     emit('likeError', getErrorMessage(error, '点赞失败'))
   } finally {
@@ -133,17 +128,5 @@ async function handleLike(event: MouseEvent) {
 
 function formatCount(value: number) {
   return value.toLocaleString('zh-CN')
-}
-
-function readLikeState() {
-  return localStorage.getItem(buildLikeStorageKey()) === '1'
-}
-
-function writeLikeState(value: boolean) {
-  localStorage.setItem(buildLikeStorageKey(), value ? '1' : '0')
-}
-
-function buildLikeStorageKey() {
-  return `zxcyj-community-like-${authStore.user?.id || 'guest'}-${props.exhibition.id}`
 }
 </script>

@@ -87,6 +87,24 @@ public class CommunityCommandRepository {
         return count != null && count > 0;
     }
 
+    public java.util.Set<Long> findUserInteractedExhibitionIds(Long userId,
+                                                               java.util.Collection<Long> exhibitionIds,
+                                                               String interactionType) {
+        if (userId == null || userId <= 0 || exhibitionIds == null || exhibitionIds.isEmpty()) {
+            return java.util.Set.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(exhibitionIds.size(), "?"));
+        String sql = "SELECT DISTINCT exhibition_id FROM exhibition_interactions"
+                + " WHERE user_id = ? AND interaction_type = ? AND exhibition_id IN (" + placeholders + ")";
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        args.add(userId);
+        args.add(interactionType);
+        args.addAll(exhibitionIds);
+        java.util.List<Long> ids = jdbcTemplate.query(sql,
+                (rs, rowNum) -> rs.getLong("exhibition_id"), args.toArray());
+        return new java.util.HashSet<>(ids);
+    }
+
     public void addInteraction(Long exhibitionId, Long userId, String interactionType, String channel) {
         jdbcTemplate.update("""
                 INSERT INTO exhibition_interactions (exhibition_id, user_id, interaction_type, channel, created_at)

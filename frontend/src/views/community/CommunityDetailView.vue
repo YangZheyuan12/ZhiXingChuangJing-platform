@@ -442,8 +442,8 @@ async function fetchCommunityDetail() {
 async function refreshDetail() {
   const viewerData = await getCommunityExhibitionDetail(exhibitionId)
   detail.value = viewerData.exhibition
-  liked.value = readInteractionState('like')
-  favorited.value = readInteractionState('favorite')
+  liked.value = viewerData.currentUserLiked ?? false
+  favorited.value = viewerData.currentUserFavorited ?? false
 }
 
 async function refreshComments() {
@@ -563,7 +563,6 @@ async function handleLike() {
   const previousLikeCount = detail.value.stats.likeCount
   const nextLiked = !liked.value
   liked.value = nextLiked
-  writeInteractionState('like', nextLiked)
   if (nextLiked) {
     triggerBump('like')
   }
@@ -588,7 +587,6 @@ async function handleLike() {
     }, '点赞失败')
   } catch {
     liked.value = !nextLiked
-    writeInteractionState('like', liked.value)
     if (detail.value) {
       detail.value = {
         ...detail.value,
@@ -609,7 +607,6 @@ async function handleFavorite() {
   const previousFavoriteCount = detail.value.stats.favoriteCount
   const nextFavorited = !favorited.value
   favorited.value = nextFavorited
-  writeInteractionState('favorite', nextFavorited)
   if (nextFavorited) {
     triggerBump('favorite')
   }
@@ -634,7 +631,6 @@ async function handleFavorite() {
     }, '收藏失败')
   } catch {
     favorited.value = !nextFavorited
-    writeInteractionState('favorite', favorited.value)
     if (detail.value) {
       detail.value = {
         ...detail.value,
@@ -722,18 +718,6 @@ function commentKey(id: number) {
 
 function reviewKey(id: number) {
   return `review-${id}`
-}
-
-function readInteractionState(type: 'like' | 'favorite') {
-  return localStorage.getItem(buildInteractionStorageKey(type)) === '1'
-}
-
-function writeInteractionState(type: 'like' | 'favorite', value: boolean) {
-  localStorage.setItem(buildInteractionStorageKey(type), value ? '1' : '0')
-}
-
-function buildInteractionStorageKey(type: 'like' | 'favorite') {
-  return `zxcyj-community-${type}-${authStore.user?.id || 'guest'}-${exhibitionId}`
 }
 
 onMounted(fetchCommunityDetail)

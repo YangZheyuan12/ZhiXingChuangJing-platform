@@ -203,7 +203,7 @@ public class TaskQueryRepository {
                         rs.getInt("comment_count")
                 ),
                 List.of(),
-                null, null, null
+                null, null, null, null
         ), taskId, limit);
     }
 

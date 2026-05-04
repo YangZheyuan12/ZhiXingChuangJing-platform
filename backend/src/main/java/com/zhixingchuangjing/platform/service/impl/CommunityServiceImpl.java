@@ -48,22 +48,41 @@ public class CommunityServiceImpl implements CommunityService {
                                                                                                String tag,
                                                                                                String sortBy,
                                                                                                Integer page,
-                                                                                               Integer pageSize) {
+                                                                                               Integer pageSize,
+                                                                                               Long userId) {
         int normalizedPage = PageUtils.normalizePage(page);
         int normalizedPageSize = PageUtils.normalizePageSize(pageSize);
+        List<ExhibitionResponses.ExhibitionSummaryResponse> rows = communityQueryRepository.findPagedCommunityExhibitions(
+                keyword, grade, theme, tag, sortBy,
+                PageUtils.offset(normalizedPage, normalizedPageSize), normalizedPageSize);
+        List<ExhibitionResponses.ExhibitionSummaryResponse> rowsWithLiked = enrichWithCurrentUserLiked(rows, userId);
         return new PageResponse<>(
-                communityQueryRepository.findPagedCommunityExhibitions(keyword, grade, theme, tag, sortBy,
-                        PageUtils.offset(normalizedPage, normalizedPageSize), normalizedPageSize),
+                rowsWithLiked,
                 normalizedPage,
                 normalizedPageSize,
                 communityQueryRepository.countCommunityExhibitions(keyword, grade, theme, tag, sortBy)
         );
     }
 
+    private List<ExhibitionResponses.ExhibitionSummaryResponse> enrichWithCurrentUserLiked(
+            List<ExhibitionResponses.ExhibitionSummaryResponse> rows, Long userId) {
+        if (rows == null || rows.isEmpty()) {
+            return rows;
+        }
+        java.util.Set<Long> likedIds = communityCommandRepository.findUserInteractedExhibitionIds(
+                userId,
+                rows.stream().map(ExhibitionResponses.ExhibitionSummaryResponse::id).toList(),
+                "like");
+        return rows.stream()
+                .map(r -> r.withCurrentUserLiked(likedIds.contains(r.id())))
+                .toList();
+    }
+
     @Override
-    public ExhibitionResponses.ExhibitionViewerDataResponse getCommunityExhibitionDetail(Long exhibitionId) {
+    public ExhibitionResponses.ExhibitionViewerDataResponse getCommunityExhibitionDetail(Long exhibitionId, Long userId) {
         assertPublicExhibition(exhibitionId);
-        return exhibitionService.getViewerData(exhibitionId, 0L, "admin");
+        // 传入真实 userId 供查询当前用户点赞/收藏状态；superuser role 用于绕过权限检查（已使用 assertPublicExhibition 预检）
+        return exhibitionService.getViewerData(exhibitionId, userId, "admin");
     }
 
     @Override

@@ -515,7 +515,7 @@ public class ExhibitionQueryRepository {
                 publishedVersionNo,
                 new ExhibitionResponses.ExhibitionStatsResponse(viewCount, likeCount, favoriteCount, commentCount),
                 findExhibitionTags(id),
-                null, null, null
+                null, null, null, null
         );
     }
 

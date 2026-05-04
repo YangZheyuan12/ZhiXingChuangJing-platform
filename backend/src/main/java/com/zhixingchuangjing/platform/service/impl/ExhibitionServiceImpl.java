@@ -11,6 +11,7 @@ import com.zhixingchuangjing.platform.model.request.ExhibitionRequests;
 import com.zhixingchuangjing.platform.model.response.CommunityResponses;
 import com.zhixingchuangjing.platform.model.response.CommonResponses;
 import com.zhixingchuangjing.platform.model.response.ExhibitionResponses;
+import com.zhixingchuangjing.platform.repository.CommunityCommandRepository;
 import com.zhixingchuangjing.platform.repository.ExhibitionCommandRepository;
 import com.zhixingchuangjing.platform.repository.ExhibitionQueryRepository;
 import com.zhixingchuangjing.platform.repository.HotspotCommandRepository;
@@ -42,6 +43,7 @@ public class ExhibitionServiceImpl implements ExhibitionService {
     private final ObjectMapper objectMapper;
     private final ZoneCommandRepository zoneCommandRepository;
     private final HotspotCommandRepository hotspotCommandRepository;
+    private final CommunityCommandRepository communityCommandRepository;
 
     public ExhibitionServiceImpl(ExhibitionQueryRepository exhibitionQueryRepository,
                                  ExhibitionCommandRepository exhibitionCommandRepository,
@@ -49,7 +51,8 @@ public class ExhibitionServiceImpl implements ExhibitionService {
                                  UserRepository userRepository,
                                  ObjectMapper objectMapper,
                                  ZoneCommandRepository zoneCommandRepository,
-                                 HotspotCommandRepository hotspotCommandRepository) {
+                                 HotspotCommandRepository hotspotCommandRepository,
+                                 CommunityCommandRepository communityCommandRepository) {
         this.exhibitionQueryRepository = exhibitionQueryRepository;
         this.exhibitionCommandRepository = exhibitionCommandRepository;
         this.taskQueryRepository = taskQueryRepository;
@@ -57,6 +60,7 @@ public class ExhibitionServiceImpl implements ExhibitionService {
         this.objectMapper = objectMapper;
         this.zoneCommandRepository = zoneCommandRepository;
         this.hotspotCommandRepository = hotspotCommandRepository;
+        this.communityCommandRepository = communityCommandRepository;
     }
 
     @Override
@@ -291,12 +295,21 @@ public class ExhibitionServiceImpl implements ExhibitionService {
         List<ExhibitionResponses.SubmissionReviewResponse> teacherReviews = exhibitionQueryRepository.findTeacherReviewsByExhibition(exhibitionId);
         List<CommunityResponses.CommentResponse> comments = exhibitionQueryRepository.findExhibitionComments(exhibitionId);
 
+        boolean currentUserLiked = false;
+        boolean currentUserFavorited = false;
+        if (userId != null && userId > 0) {
+            currentUserLiked = communityCommandRepository.hasInteraction(exhibitionId, userId, "like", "");
+            currentUserFavorited = communityCommandRepository.hasInteraction(exhibitionId, userId, "favorite", "");
+        }
+
         return new ExhibitionResponses.ExhibitionViewerDataResponse(
                 exhibition,
                 renderData,
                 digitalHuman,
                 teacherReviews,
-                comments
+                comments,
+                currentUserLiked,
+                currentUserFavorited
         );
     }
 

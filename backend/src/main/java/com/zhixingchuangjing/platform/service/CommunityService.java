@@ -13,9 +13,10 @@ public interface CommunityService {
                                                                                         String tag,
                                                                                         String sortBy,
                                                                                         Integer page,
-                                                                                        Integer pageSize);
+                                                                                        Integer pageSize,
+                                                                                        Long userId);
 
-    ExhibitionResponses.ExhibitionViewerDataResponse getCommunityExhibitionDetail(Long exhibitionId);
+    ExhibitionResponses.ExhibitionViewerDataResponse getCommunityExhibitionDetail(Long exhibitionId, Long userId);
 
     CommunityResponses.CommunityCommentsResponse getCommunityComments(Long exhibitionId);
 
