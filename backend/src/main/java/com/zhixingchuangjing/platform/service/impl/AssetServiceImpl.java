@@ -4,7 +4,7 @@ import com.zhixingchuangjing.platform.common.api.PageResponse;
 import com.zhixingchuangjing.platform.common.exception.BusinessException;
 import com.zhixingchuangjing.platform.common.util.PageUtils;
 import com.zhixingchuangjing.platform.model.response.AssetResponses;
-import com.zhixingchuangjing.platform.common.storage.MinioStorageService;
+import com.zhixingchuangjing.platform.common.storage.StorageService;
 import com.zhixingchuangjing.platform.repository.AssetRepository;
 import com.zhixingchuangjing.platform.service.AssetService;
 import org.springframework.http.HttpStatus;
@@ -20,12 +20,12 @@ public class AssetServiceImpl implements AssetService {
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
 
     private final AssetRepository assetRepository;
-    private final MinioStorageService minioStorageService;
+    private final StorageService storageService;
 
     public AssetServiceImpl(AssetRepository assetRepository,
-                            MinioStorageService minioStorageService) {
+                            StorageService storageService) {
         this.assetRepository = assetRepository;
-        this.minioStorageService = minioStorageService;
+        this.storageService = storageService;
     }
 
     @Override
@@ -42,7 +42,7 @@ public class AssetServiceImpl implements AssetService {
         String objectName = buildObjectName(userId, folder, storedFileName);
         String fileUrl;
         try {
-            fileUrl = minioStorageService.upload(file.getInputStream(), file.getSize(), mimeType, objectName);
+            fileUrl = storageService.upload(file.getInputStream(), file.getSize(), mimeType, objectName);
         } catch (java.io.IOException ex) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50012, "素材文件读取失败");
         }

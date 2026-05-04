@@ -6,13 +6,19 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.SetBucketPolicyArgs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
 
 @Service
-public class MinioStorageService {
+@ConditionalOnProperty(name = "app.storage.mode", havingValue = "minio")
+public class MinioStorageService implements StorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(MinioStorageService.class);
 
     private final MinioClient minioClient;
     private final MinioStorageProperties properties;
@@ -23,6 +29,7 @@ public class MinioStorageService {
         this.properties = properties;
     }
 
+    @Override
     public String upload(InputStream inputStream,
                          long contentLength,
                          String contentType,
@@ -38,8 +45,15 @@ public class MinioStorageService {
                             .build()
             );
             return buildFileUrl(objectName);
+        } catch (BusinessException ex) {
+            // ensureBucketReady 已经抛了明确的异常，直接传递
+            throw ex;
         } catch (Exception ex) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50010, "素材文件存储失败");
+            log.error("MinIO 上传失败 endpoint={} bucket={} object={} size={} contentType={}",
+                    properties.getEndpoint(), properties.getBucket(), objectName, contentLength, contentType, ex);
+            String reason = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50010,
+                    "素材文件存储失败: " + reason);
         }
     }
 
@@ -89,7 +103,11 @@ public class MinioStorageService {
 
             bucketInitialized = true;
         } catch (Exception ex) {
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50011, "MinIO 初始化失败");
+            log.error("MinIO 初始化失败 endpoint={} bucket={}",
+                    properties.getEndpoint(), properties.getBucket(), ex);
+            String reason = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50011,
+                    "MinIO 初始化失败: " + reason);
         }
     }
 

@@ -21,5 +21,10 @@ backend/backend.log
 backend/backend-err.log
 backend/backend-tail.txt
 
+# 本地文件存储（app.storage.mode=local 时上传的素材落盘位置）
+# 用绝对路径形式（前导 /）避免误伤 Java 包目录如 common/storage/
+/backend/storage/
+/storage/
+
 # 模板素材临时收件箱（用户 AI 生成的图先放这里，脚本会搬到 frontend/public/templates/）
 template-assets-inbox/
