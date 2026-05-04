@@ -14,7 +14,7 @@
       :title="hotspot.label ?? '热点'"
       @click="$emit('navigate', hotspot)"
     >
-      <span v-if="hotspot.icon" class="mr-1">{{ hotspot.icon }}</span>
+      <span class="mr-1">{{ resolveIcon(hotspot) }}</span>
       <span v-if="hotspot.label">{{ hotspot.label }}</span>
     </button>
   </div>
@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import type { HotspotDetail } from '@/api/types'
+import { resolveHotspotIcon } from '@/utils/hotspotIcon'
 
 defineProps<{
   hotspots: HotspotDetail[]
@@ -30,4 +31,6 @@ defineProps<{
 defineEmits<{
   navigate: [hotspot: HotspotDetail]
 }>()
+
+const resolveIcon = resolveHotspotIcon
 </script>
