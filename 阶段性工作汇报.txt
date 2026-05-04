@@ -1,0 +1,84 @@
+知行创境教育创作平台 · 阶段性工作汇报
+周期：4/24 - 5/4，共 56 次提交，今晚 5 个 commit 已推送至 origin/master
+
+━━━━ 总览 ━━━━
+后端 Spring Boot 3 + JDBC，前端 Vue 3 + TypeScript + Fabric.js
+完成 8 个阶段迭代，覆盖编辑器、观看器、提交审核、AI 讲解、热点系统、数字人五大主线
+全程 vue-tsc 零类型错误，vite build 通过，后端 maven compile 通过
+
+━━━━ 一、基础架构（4/24）━━━━
+初始化前后端分离工程结构
+启动流程文档（含 5 类常见问题诊断）
+8 类基础问题修复
+
+━━━━ 二、编辑器画布基础升级（4/24）━━━━
+1920×1080 逻辑坐标系，缩放下精度无损
+素材库拖入、自动保存、撤销/重做、快捷键、观众模式
+图层管理面板、富文本样式编辑、画布缩放控件
+对齐参考线自动吸附 + 5 套预置组件模板
+9 项自查/深度审查修复（防御性编码、history 防抖竞态等）
+
+━━━━ 三、展厅多展区架构 · 后端（5/3）━━━━
+DB 迁移：Exhibition / Zone / Exhibit / Hotspot 完整表结构
+EditorBundle 聚合查询接口（含 revision 乐观锁）
+5 套展厅模板的 seed 数据 + 实例化逻辑
+zone/exhibit 级联删除
+
+━━━━ 四、展厅多展区架构 · 前端（5/3）━━━━
+API 类型与模块完整定义
+3 个 composables：useZoneManager / useExhibitManager / useSceneRenderer
+Editor.vue 完整重写为多展区编辑器（含 409 冲突处理）
+ExhibitionViewer.vue 完整重写（含 MiniMap、HotspotButtons、ExhibitDetailModal）
+每展区独立 undo/redo 栈 + PageUp/Down/[/] 快捷键切换
+模板选择步骤接入展厅创建流
+useCanvasAutosave 重构走 draft-bundle 接口
+
+━━━━ 五、提交审核 + AI 讲解 + 社交互动（5/3）━━━━
+后端：提交审核状态机（approve/return/publish 联动 workflow_status）
+后端：AI 讲解词生成 API（基于模板，含降级）
+前端：教师班级作品管理页 + 审核对话框（评分、评语）
+前端：编辑器顶栏提交审核入口
+前端：观看页点赞/收藏/评论抽屉（服务端权威，乐观更新+回滚）
+前端：AI 讲解 modal + 数字人气泡（打字机逐字效果、音频播放）
+Bundle schema 升级到 v2，附带 savedAt
+完善启动文档：CORS、默认账号、8080 占用排查
+21 个色块占位资源 + 自动化生成/搬运脚本
+
+━━━━ 六、热点编辑器系统 · Phase 4（5/3-5/4）━━━━
+后端热点 CRUD API（导航/弹窗/外链/讲解触发 4 类）
+前端热点编辑 UI：列表、属性面板、画布拖拽、空白点击取消选中
+顶栏新增热点工具按钮
+观众点赞/收藏状态从 localStorage 改为服务端权威
+
+━━━━ 七、编辑器深度优化（5/4）━━━━
+P0 关键 bug 修复（含设计偏离纠正）
+展品重构为 Fabric 画布对象（anchor 锚点系统替代 DOM 浮层）
+展品上板：直接拖到画布即生成 + 组件库扩充 + Textbox 控制点优化
+6 项用户反馈一次修复
+展品封面/媒体一键上传集成（支持图、视频、音频）
+
+━━━━ 八、数字人讲解员系统（5/4 当天，5 个新 commit）━━━━
+设计目标：每展区可指派 1 个数字人，跨展区可复用，讲解词归属展区/展品
+后端 DB：解除 digital_humans 唯一约束 + 新增 zone_digital_human_placements 表
+后端 API：角色库 CRUD（list/create/update/delete）+ 展区指派/撤下
+后端：editor bundle 注入 digitalHumans 与 zoneDigitalHumans
+后端：抽象 StorageService，默认本地磁盘开箱即用，MinIO 可选切换
+前端：ExhibitionDetailView 单角色表单升级为多角色卡片网格 + 内联编辑
+前端：编辑器顶栏指派下拉（角色选择 + 缩放滑块 + 朝向左右切换 + 一键撤下）
+前端：画布立绘可拖拽（脚底中心锚点，乐观更新 + 失败回滚）
+前端：观看页自适应 widget — 有摆放渲染立绘+气泡；无摆放退回右下角浮窗
+前端：切展区 1 秒后自动弹首条讲解 + Esc 关闭 + 左右键翻页
+前端：兜底浮窗永远显示，无讲解内容时变灰态 + 空态提示气泡
+抽出复用组件：NarrationBubbleCard、resolveHotspotIcon 工具
+21 张展厅模板素材升级为正式版（约 30MB）
+
+━━━━ 验证状态 ━━━━
+后端 mvn -DskipTests compile：BUILD SUCCESS
+前端 npx vue-tsc --noEmit：零错误
+前端 npx vite build：dist 产物完整生成
+端到端 happy path：编辑器创建数字人 → 摆放 → 拖动 → 切展区保持 → 观看页立绘点击弹气泡 → 通过
+
+━━━━ 当前状态 ━━━━
+master 与 origin/master 同步，工作区干净
+本次推送内容 38.52 MiB（含模板图片）
+后续待跟进：TTS 朗读、数字人 3D 模型、AI 对话等扩展能力（按需）

@@ -1,0 +1,194 @@
+四个分工模块 · 现状评估与后续方向
+────────────────────────────────────
+
+═══════ 1. 陈一鑫 · 教师端完善（登录/注册）═══════
+
+【当前状态】基础设施完备，教师专属入口缺失
+登录/注册页面通用，未做角色区分
+注册接口写死 role=student（AuthServiceImpl 第 96 行），新注册账号一律是学生
+教师账号目前必须由管理员后台或 SQL 直接修改 role 字段才能产生
+后端 SecurityConfig 已支持按 role 隔离接口（@PreAuthorize 已有用法）
+路由守卫已识别角色字段并跳转不同首页
+
+【已实现】
+账号密码 + SHA256 + BCrypt 双重处理
+JWT 双 Token（access + refresh）
+SVG 图形验证码 + Redis 5 分钟过期
+登录后按 role 跳转：admin → 管理后台、teacher → 创作工作台、student → 学生首页
+注册成功 toast 提示 + 跳转登录
+教师专属页面已存在：DashboardView、TaskListView、TaskDetailView、TaskCreateView、TaskSubmissionsView
+
+【缺失 / 待补】
+注册页无"我是教师/学生"角色选择 radio
+教师注册后需要审核流程（不能任何人自称教师即生效）
+缺少教师身份证明字段（学校 ID、教工号、证件照）
+缺少手机号 / 邮箱验证（DB 字段已有 mobile/email 但未发短信邮件）
+缺少找回密码 / 修改密码流程
+缺少教师账号管理后台（管理员审核教师申请）
+缺少登录失败次数限制 / 账号锁定
+缺少第三方登录（微信/钉钉/学校统一认证）
+
+【后续方向（按优先级）】
+P0 注册页加角色单选 + 教师角色加学校选择 / 教工号字段
+P0 教师注册走"待审核 status=pending"机制，管理员后台批准后才能登录
+P0 找回密码（手机短信 / 邮箱链接二选一）
+P1 登录失败 5 次锁定 15 分钟（写入 Redis）
+P1 教师身份审核界面（管理员视角，查看证件照、批准/驳回）
+P1 教师工作台首页强化：今日任务、待审作品数、班级动态（Dashboard 现在框架空）
+P2 接入学校统一身份认证（SSO / CAS / OAuth2）
+
+【估时】3-5 天
+
+═══════ 2. 欧英驰 · AI 实现 / 结构图 ═══════
+
+【当前状态】基础接口在跑，但是模板生成不是真 AI
+唯一 AI 接口：POST /api/v1/ai/narration（生成展品讲解词）
+实现方式：基于模板拼接（AiServiceImpl），不调用任何大模型
+"结构图"功能目前没有任何代码
+
+【已实现】
+AiController + AiService + AiServiceImpl 已完整骨架
+GenerateNarrationRequest 接收：展品标题、描述、知识点、风格、年级、最大字数
+返回：讲解词正文 + 推荐知识点列表
+前端编辑器内"AI 生成讲解词"模态框（NarrationGenerator）
+一键保存到展品 narration 字段
+风格 / 年级 / 字数 三档可选
+
+【缺失 / 待补】
+没有真实大模型调用（模板拼字符串）
+没有 API Key 配置项（application.yml 里无 AI 段）
+没有错误降级（模型超时 / 限流处理）
+没有 token 用量统计
+没有"结构图"任何代码 — 这是新模块
+
+【后续方向（按优先级）】
+P0 接入真实大模型（建议 DeepSeek-V3 或智谱 GLM-4，国内免备案、便宜、效果好）
+   ├─ application.yml 加 ai.provider / ai.api-key / ai.model 配置
+   ├─ AiServiceImpl 拆出 LlmClient 接口，模板版作 fallback
+   ├─ 调用失败自动降级到模板版（保证可用）
+   └─ 加 token 用量日志（防止超额）
+
+P0 结构图功能（推断为以下之一，需进一步对齐需求）
+   方向 A：知识图谱 — 展品/展区/知识点之间的关系图，前端 ECharts Graph 渲染
+   方向 B：思维导图 — 教师写好讲解大纲后 AI 生成思维导图，前端用 markmap.js 渲染
+   方向 C：流程图 / 时序图 — AI 根据描述生成 Mermaid 代码，前端 mermaid.js 渲染
+   方向 D：展厅结构图 — 自动生成 Zone/Exhibit 关系总览，编辑器侧边栏展示
+
+P1 AI 对话功能（数字人聊天）— 围绕展厅内容的多轮问答
+P1 AI 评分辅助（学生作品自动初评建议）
+P1 AI 翻译（讲解词多语言）
+P2 AI 图像生成（SD / DALL-E）配合素材库
+
+【估时】结构图功能本身 5-7 天 + 真实 AI 接入 2-3 天
+
+═══════ 3. 张晨 · 资料库 ═══════
+
+【当前状态】两条资料线均已铺底，深度集成不足
+资料库目前实际有两类：
+  类型 A：文博资源库（MuseumResource）— 公共馆藏，所有人可浏览
+  类型 B：个人素材库（AssetLibrary）— 用户私有上传文件
+另有教师任务素材（TaskMaterials）— 任务下挂的参考资料
+
+【已实现】
+后端 MuseumController + MuseumService + 数据库表
+后端 AssetController + AssetService + Storage 抽象（本地/MinIO）
+前端 MuseumResourceView 列表页（76 处样式与 76 处筛选 — 体量大）
+前端 MuseumResourceDetailView 详情页
+前端 AssetLibraryView 个人素材库（上传/删除/搜索）
+任务创建页 TaskCreateView 可挂任务素材
+编辑器内素材库面板可直接拖入画布
+资源类型支持：image / video / audio / document / external_link
+
+【缺失 / 待补】
+文博资源数据是否已批量导入未确认（可能 seed 表是空的）
+文博资源缺少分类标签体系（朝代/材质/产地等多维筛选）
+个人素材无文件夹 / 标签分组（文件多了找不到）
+素材无版本管理（替换图片后历史版本丢失）
+素材无去重（同一文件多次上传占双份空间，未走 hash）
+没有"收藏到我的素材库"功能（看到好的文博资源不能一键收藏）
+没有素材引用追踪（删除素材时不知道哪些展品在用）
+没有素材审核机制（公开素材库谁都能上传可能不合适）
+
+【后续方向（按优先级）】
+P0 文博资源批量导入：写脚本从国博 / 故宫开放接口爬取或手工整理 CSV
+P0 文博资源分类筛选完善：朝代、材质、馆藏、地区，多维 chip 过滤
+P0 "收藏文博资源 → 我的素材库"一键引用功能
+P1 个人素材库加文件夹 + 标签
+P1 素材去重（上传时算 SHA256，相同跳过）
+P1 素材引用反查（点击素材看哪些展品在用）
+P1 任务素材库（教师常用素材沉淀）— 教师可建立自己的"教学素材包"
+P2 素材市场（教师之间共享、付费购买）
+P2 CDN 接入加速大文件加载
+P2 大文件分片上传（视频可能 100MB+）
+
+【估时】4-7 天（取决于文博数据导入规模）
+
+═══════ 4. 李艺 · 前端美化 ═══════
+
+【当前状态】功能驱动型样式，缺统一视觉语言
+TailwindCSS 体系完整，brand 色已定义
+基础组件视觉风格各页面一致性 70%
+缺少 Design System / 设计 token 体系
+
+【已实现】
+TailwindCSS + brand 色调（brand-50 ~ brand-900）
+基础组件：button、input、modal、toast 已做
+登录注册页有简洁风格
+编辑器三栏布局（左侧栏 + 画布 + 右属性面板）
+观看页 MiniMap / HotspotButtons / 数字人立绘 + 气泡（打字机效果）
+图标主要走 emoji（🎙🤖🧍 等）+ 内联 SVG
+渐变色彩（数字人浮窗 from-brand-500 to-brand-700）
+基础动画（Vue Transition + CSS keyframes）
+
+【缺失 / 不足】
+没有统一的设计 token（颜色、间距、圆角散落各页面）
+没有暗色模式
+没有加载骨架屏（Loading 全是 "加载中..."文字）
+没有空态插画（空数据全是文字提示）
+图标体系不统一（emoji + SVG + 文字符号混用）
+字体选型未优化（默认系统字体，没接 NotoSerif / 思源宋体等）
+响应式适配差，移动端基本不可用（编辑器固定 1920×1080）
+页面切换无过渡（router 跳转生硬）
+按钮悬停反馈风格不一致（部分有 hover、部分没有）
+表单错误提示视觉不统一
+列表页无滚动到顶按钮
+缺少全局通用组件库（Button、Modal、Drawer 等没有提取）
+登录/注册页太朴素，整个站点首页（公开访问）几乎没设计感
+"知行创境"品牌识别弱（无 logo、无主视觉）
+
+【后续方向（按优先级）】
+P0 建立 Design Token：colors.json + typography.json + shadows.json
+   ├─ 主色 brand 已有，再补 success / warning / error / info
+   ├─ 圆角统一 4 / 8 / 12 / 16 / 24px 五档
+   └─ 阴影统一 sm / md / lg / xl 四档
+P0 提取通用组件 ZxButton / ZxModal / ZxInput / ZxSelect 到 components/ui/
+P0 给品牌做一套 Logo + 主视觉（建议简约书法体"知行创境"+ 山水/古卷元素）
+P0 登录/注册/首页重新设计，统一品牌调性
+P0 引入 lucide-vue-next 替换大部分 emoji 和手写 SVG
+P0 加加载骨架屏（vue-content-loader 或自写）
+P1 暗色模式（Tailwind dark: 体系）
+P1 空态插画（找开源插画或 AI 生成）
+P1 页面切换过渡动画（router-view + Transition）
+P1 字体接思源宋体 / 阿里巴巴普惠体
+P1 编辑器响应式 / 大屏适配
+P2 移动端适配（观看页优先，编辑器先 PC-only）
+P2 国际化 i18n（vue-i18n）
+P2 配色主题切换（多套展厅风格主题）
+
+【估时】系统性美化约 7-10 天，分批迭代更稳妥
+建议先 5 天做 P0（设计 token + 通用组件 + Logo + 登录注册首页 + lucide），
+后面 P1/P2 跟功能开发并行优化
+
+═══════ 整体协作建议 ═══════
+
+陈一鑫的教师审核流程依赖管理员后台 → 张晨可以并行做资料库后端，互不干扰
+欧英驰接 LLM 时建议 application.yml 配置项加 ai.provider 字段，方便后期切换
+李艺的设计 token 越早做越好，否则各人代码里散落的色号 / 间距改起来很痛
+建议建一个 Figma 或飞书文档共享 设计规范 / API 契约 / 任务进度
+每天晚上 push 一次，周三 / 周日各一次集成测试
+
+═══════ 风险提示 ═══════
+后端目前没有单元测试 → 任何人改 Controller / Service 都可能引入回归
+前端 vue-tsc 必须保持零错误，否则线上构建会挂
+数据库迁移目前是手动执行（无 Flyway/Liquibase）→ 各人改表结构需先群里同步
+模板素材已 30MB → 后续大资源建议走 OSS / CDN，不进 git
