@@ -223,8 +223,6 @@
             :hotspot-draggable="activeRightTab === 'hotspot'"
             @hotspot-select="handleHotspotClick"
             @hotspot-drag-end="handleHotspotDragEnd"
-            @exhibit-select="handleExhibitClick"
-            @exhibit-placement="handleExhibitPlacementUpdate"
           />
         </div>
 
@@ -328,7 +326,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, toRef, triggerRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, toRef, triggerRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Canvas, Circle, Line, Rect, Shadow, Textbox, FabricImage, Group, type FabricObject } from 'fabric'
 import { publishExhibition } from '@/api/modules/exhibitions'
@@ -387,7 +385,7 @@ import CreateExhibitDialog from '@/components/exhibitions/editor/CreateExhibitDi
 // ─── 常量 ───
 const LOGICAL_WIDTH = 1920
 const LOGICAL_HEIGHT = 1080
-const CUSTOM_PROPS = ['assetType', 'assetId', 'mediaUrl', 'assetName']
+const CUSTOM_PROPS = ['assetType', 'assetId', 'mediaUrl', 'assetName', 'exhibitId']
 
 // ─── 路由 & Store ───
 const route = useRoute()
@@ -505,9 +503,20 @@ const autosave = useCanvasAutosave(
   () => exhibitionId,
   {
     currentZoneCode: () => currentZone.value?.zoneCode ?? null,
-    getCanvasJson: () => fabricCanvas.value ? (fabricCanvas.value as any).toJSON(CUSTOM_PROPS) : null,
+    getCanvasJson: () => getCanvasJsonClean(),
   },
 )
+
+// 序列化画布时过滤掉展品 anchor 对象 —— 它们的位置存在 exhibit.placementJson，不走 layoutConfig
+function getCanvasJsonClean(): Record<string, unknown> | null {
+  const canvas = fabricCanvas.value
+  if (!canvas) return null
+  const json = (canvas as any).toJSON(CUSTOM_PROPS)
+  if (json && Array.isArray(json.objects)) {
+    json.objects = json.objects.filter((o: any) => o?.assetType !== 'exhibit-anchor')
+  }
+  return json
+}
 const { lastAutosaveAt, autosaveError, autosaving } = autosave
 
 const autosaveTimeAgo = computed(() => {
@@ -549,7 +558,13 @@ function initCanvas() {
     selectedObject.value = null
     selectedHotspotId.value = null
   })
-  canvas.on('object:modified', syncSelectedProps)
+  canvas.on('object:modified', (e: any) => {
+    syncSelectedProps()
+    const target = e?.target as FabricObject | undefined
+    if (target && (target as any).assetType === 'exhibit-anchor') {
+      handleAnchorModified(target)
+    }
+  })
   canvas.on('object:added', refreshLayers)
   canvas.on('object:removed', refreshLayers)
 
@@ -605,7 +620,8 @@ async function handleZoneSwitchInternal(from: ZoneDetail | null, to: ZoneDetail)
   ])
   const canvas = fabricCanvas.value
   if (from && canvas) {
-    canvasDataCache.set(from.id, (canvas as any).toJSON(CUSTOM_PROPS))
+    const cleanJson = getCanvasJsonClean()
+    if (cleanJson) canvasDataCache.set(from.id, cleanJson)
   }
 
   if (canvas) {
@@ -627,6 +643,9 @@ async function handleZoneSwitchInternal(from: ZoneDetail | null, to: ZoneDetail)
     fitCanvasToContainer()
     canvas.requestRenderAll()
   }
+
+  // 同步展品 anchor（在 layoutConfig 被加载后进行）
+  await syncExhibitAnchors()
 
   history.switchZone(to.zoneCode)
   history.reset()
@@ -881,36 +900,221 @@ function handleHotspotClick(id: number) {
   activeRightTab.value = 'hotspot'
 }
 
-function handleExhibitClick(id: number) {
-  em.selectExhibit(id)
-  activeRightTab.value = 'exhibit'
+// ═══════════════════════════════════════════════════════════
+//  展品 ↔ Fabric 画布对象（anchor）双向同步
+// ═══════════════════════════════════════════════════════════
+
+const TYPE_LABELS_FOR_ANCHOR: Record<string, string> = {
+  image: '图片', video: '视频', audio: '音频', text: '文本',
+  model: '3D', '3d': '3D', artifact: '文物', document: '文档',
 }
 
-async function handleExhibitPlacementUpdate(
-  id: number,
-  placement: { x: number; y: number; w: number; h: number },
-) {
-  const ex = allExhibits.value.find(e => e.id === id)
-  if (!ex) return
-  const nextPlacementJson = { ...placement }
-  // 乐观更新：slot 模式被拖动自动转 freeform
-  em.updateExhibit(id, {
-    placementMode: 'freeform',
-    placementJson: nextPlacementJson,
-  } as Partial<ExhibitDetail>)
-  try {
-    await updateExhibit(exhibitionId, id, {
-      placementMode: 'freeform',
-      placementJson: nextPlacementJson,
-    })
-  } catch (error) {
-    appStore.showToast(getErrorMessage(error, '位置保存失败'), 'error')
-    // 回滚
-    em.updateExhibit(id, {
-      placementMode: ex.placementMode,
-      placementJson: ex.placementJson,
-    } as Partial<ExhibitDetail>)
+const anchorPatchTimers = new Map<number, ReturnType<typeof setTimeout>>()
+
+function computeAnchorBox(
+  ex: ExhibitDetail,
+  slotMap: Map<string, SlotConfig>,
+): { left: number; top: number; width: number; height: number } | null {
+  let x = 0, y = 0, w = 0, h = 0
+  if (ex.placementMode === 'slot' && ex.slotCode) {
+    const s = slotMap.get(ex.slotCode)
+    if (!s) return null
+    x = s.x; y = s.y; w = s.w; h = s.h
+  } else {
+    const p = (ex.placementJson ?? {}) as Record<string, unknown>
+    x = typeof p.x === 'number' ? p.x : 35
+    y = typeof p.y === 'number' ? p.y : 35
+    w = typeof p.w === 'number' ? p.w : 30
+    h = typeof p.h === 'number' ? p.h : 30
   }
+  return {
+    left: (x / 100) * LOGICAL_WIDTH,
+    top: (y / 100) * LOGICAL_HEIGHT,
+    width: (w / 100) * LOGICAL_WIDTH,
+    height: (h / 100) * LOGICAL_HEIGHT,
+  }
+}
+
+function createPlaceholderAnchor(
+  ex: ExhibitDetail,
+  box: { left: number; top: number; width: number; height: number },
+): FabricObject {
+  const bg = new Rect({
+    left: 0, top: 0,
+    width: box.width, height: box.height,
+    fill: '#f1f5f9', stroke: '#cbd5e1', strokeWidth: 1,
+    rx: 8, ry: 8,
+    selectable: false, evented: false,
+  })
+  const typeBadge = new Textbox(TYPE_LABELS_FOR_ANCHOR[ex.exhibitType] ?? ex.exhibitType, {
+    left: 8, top: 6, width: Math.max(40, box.width - 16),
+    fontSize: 11, fill: '#64748b',
+    fontFamily: 'sans-serif',
+    selectable: false, evented: false,
+  })
+  const title = new Textbox(ex.title, {
+    left: 8, top: 24, width: Math.max(40, box.width - 16),
+    fontSize: 14, fill: '#1e293b', fontWeight: '500',
+    fontFamily: 'sans-serif',
+    selectable: false, evented: false,
+  })
+  return new Group([bg, typeBadge, title], {
+    left: box.left, top: box.top,
+    originX: 'left', originY: 'top',
+  })
+}
+
+async function createExhibitAnchor(
+  ex: ExhibitDetail,
+  box: { left: number; top: number; width: number; height: number },
+): Promise<FabricObject | null> {
+  const url = ex.coverUrl || ex.mediaUrl
+  let obj: FabricObject
+  if (url) {
+    try {
+      const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' })
+      const iw = img.width ?? box.width
+      const ih = img.height ?? box.height
+      img.set({
+        left: box.left, top: box.top,
+        scaleX: box.width / iw,
+        scaleY: box.height / ih,
+        originX: 'left', originY: 'top',
+      })
+      obj = img
+    } catch {
+      obj = createPlaceholderAnchor(ex, box)
+    }
+  } else {
+    obj = createPlaceholderAnchor(ex, box)
+  }
+  ;(obj as any).assetType = 'exhibit-anchor'
+  ;(obj as any).exhibitId = ex.id
+  applyDefaultControls(obj)
+  // 展品保持卡片正向，禁用旋转
+  obj.setControlsVisibility({
+    tl: true, tr: true, bl: true, br: true,
+    ml: true, mr: true, mt: true, mb: true,
+    mtr: false,
+  })
+  return obj
+}
+
+async function syncExhibitAnchors() {
+  const canvas = fabricCanvas.value
+  if (!canvas) return
+  const exhibits = zoneExhibits.value
+  const slots = zoneSlots.value
+  const slotMap = new Map(slots.map(s => [s.code, s]))
+
+  // 现有 anchor 索引
+  const existingMap = new Map<number, FabricObject>()
+  for (const o of canvas.getObjects()) {
+    if ((o as any).assetType === 'exhibit-anchor') {
+      const id = (o as any).exhibitId
+      if (typeof id === 'number') existingMap.set(id, o)
+    }
+  }
+
+  // 删除已不存在的 anchor
+  const wantIds = new Set(exhibits.map(e => e.id))
+  for (const [id, obj] of existingMap) {
+    if (!wantIds.has(id)) canvas.remove(obj)
+  }
+
+  // 创建/更新需要的 anchor
+  const active = canvas.getActiveObject()
+  for (const ex of exhibits) {
+    const box = computeAnchorBox(ex, slotMap)
+    if (!box) continue
+    const existing = existingMap.get(ex.id)
+    if (existing) {
+      // 用户正在拖动当前 anchor 时不打断
+      if (existing === active) continue
+      const curLeft = existing.left ?? 0
+      const curTop = existing.top ?? 0
+      const curWidth = (existing.width ?? 0) * (existing.scaleX ?? 1)
+      const curHeight = (existing.height ?? 0) * (existing.scaleY ?? 1)
+      const eps = 1
+      if (
+        Math.abs(curLeft - box.left) > eps ||
+        Math.abs(curTop - box.top) > eps ||
+        Math.abs(curWidth - box.width) > eps ||
+        Math.abs(curHeight - box.height) > eps
+      ) {
+        const iw = (existing as any).width ?? 1
+        const ih = (existing as any).height ?? 1
+        // FabricImage 用 scale 调尺寸；Group 直接设 width/height + scale=1
+        if (existing.type === 'image') {
+          existing.set({
+            left: box.left, top: box.top,
+            scaleX: box.width / iw,
+            scaleY: box.height / ih,
+          })
+        } else {
+          existing.set({
+            left: box.left, top: box.top,
+            scaleX: box.width / iw,
+            scaleY: box.height / ih,
+          })
+        }
+        existing.setCoords()
+      }
+      continue
+    }
+    const anchor = await createExhibitAnchor(ex, box)
+    if (anchor) canvas.add(anchor)
+  }
+  canvas.requestRenderAll()
+}
+
+// zoneExhibits 变化 → 同步画布 anchor（增/删/封面更新）
+watch(
+  () => zoneExhibits.value.map(e => ({
+    id: e.id,
+    coverUrl: e.coverUrl,
+    mediaUrl: e.mediaUrl,
+    title: e.title,
+    placementMode: e.placementMode,
+    placementJson: e.placementJson,
+    slotCode: e.slotCode,
+  })),
+  () => { void syncExhibitAnchors() },
+  { deep: true },
+)
+
+function handleAnchorModified(obj: FabricObject) {
+  const exhibitId = (obj as any).exhibitId as number | undefined
+  if (typeof exhibitId !== 'number') return
+  const left = obj.left ?? 0
+  const top = obj.top ?? 0
+  const width = (obj.width ?? 0) * (obj.scaleX ?? 1)
+  const height = (obj.height ?? 0) * (obj.scaleY ?? 1)
+  const placement = {
+    x: Math.round((left / LOGICAL_WIDTH) * 10000) / 100,
+    y: Math.round((top / LOGICAL_HEIGHT) * 10000) / 100,
+    w: Math.round((width / LOGICAL_WIDTH) * 10000) / 100,
+    h: Math.round((height / LOGICAL_HEIGHT) * 10000) / 100,
+  }
+  // 乐观更新本地 placementMode / placementJson
+  em.updateExhibit(exhibitId, {
+    placementMode: 'freeform',
+    placementJson: placement,
+  } as Partial<ExhibitDetail>)
+  // debounce 回写后端
+  const existing = anchorPatchTimers.get(exhibitId)
+  if (existing) clearTimeout(existing)
+  anchorPatchTimers.set(exhibitId, setTimeout(async () => {
+    anchorPatchTimers.delete(exhibitId)
+    try {
+      await updateExhibit(exhibitionId, exhibitId, {
+        placementMode: 'freeform',
+        placementJson: placement,
+      })
+    } catch (error) {
+      appStore.showToast(getErrorMessage(error, '位置保存失败'), 'error')
+    }
+  }, 400))
 }
 
 async function handleHotspotCreate() {
@@ -1030,7 +1234,14 @@ function syncSelectedProps() {
   selectedProps.y = obj.top ?? 0
   selectedProps.w = (obj.width ?? 0) * (obj.scaleX ?? 1)
   selectedProps.h = (obj.height ?? 0) * (obj.scaleY ?? 1)
-  activeRightTab.value = 'element'
+  // 展品 anchor 被选中 → 路由到展品 Tab
+  if ((obj as any).assetType === 'exhibit-anchor') {
+    const exhibitId = (obj as any).exhibitId
+    if (typeof exhibitId === 'number') em.selectExhibit(exhibitId)
+    activeRightTab.value = 'exhibit'
+  } else {
+    activeRightTab.value = 'element'
+  }
 }
 
 function onPropInput(key: string, e: Event) {
@@ -1477,7 +1688,8 @@ function buildCanvasDataMap(): Record<string, Record<string, unknown>> {
   const canvas = fabricCanvas.value
   const map: Record<string, Record<string, unknown>> = {}
   if (currentZone.value && canvas) {
-    canvasDataCache.set(currentZone.value.id, (canvas as any).toJSON(CUSTOM_PROPS))
+    const cleanJson = getCanvasJsonClean()
+    if (cleanJson) canvasDataCache.set(currentZone.value.id, cleanJson)
   }
   for (const zone of zones.value) {
     const data = canvasDataCache.get(zone.id)
@@ -1597,6 +1809,7 @@ async function restoreCurrentZone() {
   if (data && typeof data === 'object' && 'objects' in data) {
     await canvas.loadFromJSON(data)
   }
+  await syncExhibitAnchors()
   fitCanvasToContainer()
   canvas.requestRenderAll()
   history.reset()

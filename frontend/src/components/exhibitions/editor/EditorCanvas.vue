@@ -16,16 +16,6 @@
       :active-slot-code="activeSlotCode"
       :used-slot-codes="usedSlotCodes"
     />
-    <ExhibitOverlay
-      v-if="exhibits.length > 0"
-      class="z-25"
-      :exhibits="exhibits"
-      :slots="slots"
-      :zoom="zoom"
-      :selected-exhibit-id="selectedExhibitId"
-      @select="(id) => emit('exhibit-select', id)"
-      @update-placement="(id, p) => emit('exhibit-placement', id, p)"
-    />
     <HotspotOverlay
       class="z-30"
       :hotspots="hotspots"
@@ -44,7 +34,6 @@ import type { ExhibitDetail, HotspotDetail, SlotConfig } from '@/api/types'
 import SceneBackground from './SceneBackground.vue'
 import HotspotOverlay from './HotspotOverlay.vue'
 import ExhibitSlotOverlay from './ExhibitSlotOverlay.vue'
-import ExhibitOverlay from './ExhibitOverlay.vue'
 
 const props = defineProps<{
   backgroundUrl: string | null
@@ -63,8 +52,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   'hotspot-select': [id: number]
   'hotspot-drag-end': [id: number, xPercent: number, yPercent: number]
-  'exhibit-select': [id: number]
-  'exhibit-placement': [id: number, placement: { x: number; y: number; w: number; h: number }]
 }>()
 
 const usedSlotCodes = computed(() =>
