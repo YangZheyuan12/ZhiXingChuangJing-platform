@@ -79,4 +79,57 @@ public class ZoneQueryRepository {
         List<Long> ids = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getLong("exhibition_id"), zoneId);
         return ids.isEmpty() ? null : ids.get(0);
     }
+
+    /**
+     * 查询单个展区的数字人摆放（关联数字人基础信息），不存在则返回 null。
+     */
+    public ZoneResponses.ZoneDigitalHumanPlacementResponse findZoneDigitalHumanPlacement(Long zoneId) {
+        String sql = """
+                SELECT
+                  p.zone_id, p.digital_human_id,
+                  p.x_percent, p.y_percent, p.scale, p.facing,
+                  dh.name, dh.avatar_2d_url, dh.model_3d_url,
+                  dh.persona, dh.voice_type
+                FROM zone_digital_human_placements p
+                JOIN digital_humans dh ON dh.id = p.digital_human_id
+                WHERE p.zone_id = ?
+                """;
+        List<ZoneResponses.ZoneDigitalHumanPlacementResponse> list =
+                jdbcTemplate.query(sql, ZONE_DIGITAL_HUMAN_PLACEMENT_ROW_MAPPER, zoneId);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    /**
+     * 查询指定展厅下所有展区的数字人摆放。用于 editor-bundle / viewer 一次性下发。
+     */
+    public List<ZoneResponses.ZoneDigitalHumanPlacementResponse> findZoneDigitalHumansByExhibition(Long exhibitionId) {
+        String sql = """
+                SELECT
+                  p.zone_id, p.digital_human_id,
+                  p.x_percent, p.y_percent, p.scale, p.facing,
+                  dh.name, dh.avatar_2d_url, dh.model_3d_url,
+                  dh.persona, dh.voice_type
+                FROM zone_digital_human_placements p
+                JOIN digital_humans dh ON dh.id = p.digital_human_id
+                JOIN exhibition_zones z ON z.id = p.zone_id
+                WHERE z.exhibition_id = ?
+                ORDER BY z.sort_order, z.id
+                """;
+        return jdbcTemplate.query(sql, ZONE_DIGITAL_HUMAN_PLACEMENT_ROW_MAPPER, exhibitionId);
+    }
+
+    private static final org.springframework.jdbc.core.RowMapper<ZoneResponses.ZoneDigitalHumanPlacementResponse>
+            ZONE_DIGITAL_HUMAN_PLACEMENT_ROW_MAPPER = (rs, rowNum) -> new ZoneResponses.ZoneDigitalHumanPlacementResponse(
+                    rs.getLong("zone_id"),
+                    rs.getLong("digital_human_id"),
+                    rs.getString("name"),
+                    rs.getString("avatar_2d_url"),
+                    rs.getString("model_3d_url"),
+                    rs.getString("persona"),
+                    rs.getString("voice_type"),
+                    rs.getDouble("x_percent"),
+                    rs.getDouble("y_percent"),
+                    rs.getDouble("scale"),
+                    rs.getString("facing")
+            );
 }

@@ -42,4 +42,21 @@ public final class ZoneResponses {
         LocalDateTime lockedAt,
         String status
     ) {}
+
+    /**
+     * 展区数字人摆放响应，同时携带数字人基础信息便于前端直接渲染立绘。
+     */
+    public record ZoneDigitalHumanPlacementResponse(
+        Long zoneId,
+        Long digitalHumanId,
+        String name,
+        String avatar2dUrl,
+        String model3dUrl,
+        String persona,
+        String voiceType,
+        Double xPercent,
+        Double yPercent,
+        Double scale,
+        String facing
+    ) {}
 }

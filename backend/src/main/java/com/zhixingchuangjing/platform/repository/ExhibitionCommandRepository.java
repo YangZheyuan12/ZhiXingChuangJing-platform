@@ -197,6 +197,10 @@ public class ExhibitionCommandRepository {
         return jdbcTemplate.queryForObject(sql, Integer.class, exhibitionId);
     }
 
+    /**
+     * 老接口兼容 ── 只操作展厅最早的角色，没有则创建。
+     * 新逻辑请走 {@link #createDigitalHuman} / {@link #updateDigitalHuman}。
+     */
     public Long upsertDigitalHuman(Long exhibitionId,
                                    String name,
                                    String avatar2dUrl,
@@ -206,32 +210,65 @@ public class ExhibitionCommandRepository {
                                    String storyScript,
                                    String storyTimelineJson) {
         List<Long> existingIds = jdbcTemplate.query("""
-                SELECT id FROM digital_humans WHERE exhibition_id = ? LIMIT 1
+                SELECT id FROM digital_humans
+                WHERE exhibition_id = ?
+                ORDER BY sort_no, id
+                LIMIT 1
                 """, (rs, rowNum) -> rs.getLong("id"), exhibitionId);
         if (existingIds.isEmpty()) {
-            String sql = """
-                    INSERT INTO digital_humans (
-                      exhibition_id, name, avatar_2d_url, model_3d_url, persona, voice_type,
-                      story_script, story_timeline, sort_no, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), 1, 'active', NOW(), NOW())
-                    """;
-            KeyHolder keyHolder = new GeneratedKeyHolder();
-            jdbcTemplate.update(connection -> {
-                PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-                ps.setLong(1, exhibitionId);
-                ps.setString(2, name);
-                ps.setString(3, avatar2dUrl);
-                ps.setString(4, model3dUrl);
-                ps.setString(5, persona);
-                ps.setString(6, voiceType);
-                ps.setString(7, storyScript);
-                ps.setString(8, storyTimelineJson);
-                return ps;
-            }, keyHolder);
-            return keyHolder.getKey().longValue();
+            return createDigitalHuman(exhibitionId, name, avatar2dUrl, model3dUrl,
+                    persona, voiceType, storyScript, storyTimelineJson);
         }
-
         Long digitalHumanId = existingIds.get(0);
+        updateDigitalHuman(digitalHumanId, name, avatar2dUrl, model3dUrl,
+                persona, voiceType, storyScript, storyTimelineJson);
+        return digitalHumanId;
+    }
+
+    public Long createDigitalHuman(Long exhibitionId,
+                                   String name,
+                                   String avatar2dUrl,
+                                   String model3dUrl,
+                                   String persona,
+                                   String voiceType,
+                                   String storyScript,
+                                   String storyTimelineJson) {
+        Integer nextSort = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(MAX(sort_no), 0) + 1
+                FROM digital_humans WHERE exhibition_id = ?
+                """, Integer.class, exhibitionId);
+        int sortNo = nextSort == null ? 1 : nextSort;
+        String sql = """
+                INSERT INTO digital_humans (
+                  exhibition_id, name, avatar_2d_url, model_3d_url, persona, voice_type,
+                  story_script, story_timeline, sort_no, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON), ?, 'active', NOW(), NOW())
+                """;
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, exhibitionId);
+            ps.setString(2, name);
+            ps.setString(3, avatar2dUrl);
+            ps.setString(4, model3dUrl);
+            ps.setString(5, persona);
+            ps.setString(6, voiceType);
+            ps.setString(7, storyScript);
+            ps.setString(8, storyTimelineJson);
+            ps.setInt(9, sortNo);
+            return ps;
+        }, keyHolder);
+        return keyHolder.getKey().longValue();
+    }
+
+    public int updateDigitalHuman(Long digitalHumanId,
+                                  String name,
+                                  String avatar2dUrl,
+                                  String model3dUrl,
+                                  String persona,
+                                  String voiceType,
+                                  String storyScript,
+                                  String storyTimelineJson) {
         String sql = """
                 UPDATE digital_humans
                 SET name = ?,
@@ -244,7 +281,18 @@ public class ExhibitionCommandRepository {
                     updated_at = NOW()
                 WHERE id = ?
                 """;
-        jdbcTemplate.update(sql, name, avatar2dUrl, model3dUrl, persona, voiceType, storyScript, storyTimelineJson, digitalHumanId);
-        return digitalHumanId;
+        return jdbcTemplate.update(sql, name, avatar2dUrl, model3dUrl, persona, voiceType,
+                storyScript, storyTimelineJson, digitalHumanId);
+    }
+
+    public int deleteDigitalHuman(Long digitalHumanId) {
+        return jdbcTemplate.update("DELETE FROM digital_humans WHERE id = ?", digitalHumanId);
+    }
+
+    public int countZonesUsingDigitalHuman(Long digitalHumanId) {
+        Integer cnt = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1) FROM zone_digital_human_placements WHERE digital_human_id = ?
+                """, Integer.class, digitalHumanId);
+        return cnt == null ? 0 : cnt;
     }
 }

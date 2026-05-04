@@ -141,4 +141,19 @@ public class ExhibitionController extends BaseController {
             @Valid @RequestBody ExhibitionRequests.UpsertDigitalHumanRequest request) {
         return success(exhibitionService.upsertDigitalHuman(exhibitionId, currentUser.getId(), currentUser.getRole(), request));
     }
+
+    @GetMapping("/{exhibitionId}/digital-humans")
+    public ApiResponse<List<ExhibitionResponses.DigitalHumanResponse>> listDigitalHumans(
+            @PathVariable Long exhibitionId,
+            @AuthenticationPrincipal SecurityUserDetails currentUser) {
+        return success(exhibitionService.listDigitalHumans(exhibitionId, currentUser.getId(), currentUser.getRole()));
+    }
+
+    @PostMapping("/{exhibitionId}/digital-humans")
+    public ApiResponse<ExhibitionResponses.DigitalHumanResponse> createDigitalHuman(
+            @PathVariable Long exhibitionId,
+            @AuthenticationPrincipal SecurityUserDetails currentUser,
+            @Valid @RequestBody ExhibitionRequests.UpsertDigitalHumanRequest request) {
+        return success(exhibitionService.createDigitalHuman(exhibitionId, currentUser.getId(), currentUser.getRole(), request));
+    }
 }

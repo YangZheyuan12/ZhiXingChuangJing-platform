@@ -87,9 +87,14 @@ public class EditorBundleServiceImpl implements EditorBundleService {
             }
         }
         var hotspots = hotspotQuery.listByExhibition(exhibitionId);
+        var digitalHumans = exhibitionService.listDigitalHumans(exhibitionId, userId, role);
+        var zoneDigitalHumans = zoneQuery.findZoneDigitalHumansByExhibition(exhibitionId);
+        var primaryDigitalHuman = digitalHumans.isEmpty() ? null : digitalHumans.get(0);
         Integer revision = exhibitionQuery.getBundleRevision(exhibitionId);
         return new EditorBundleResponses.EditorBundleResponse(
-            exhibition, zones, allExhibits, hotspots, null, null, revision
+            exhibition, zones, allExhibits, hotspots,
+            primaryDigitalHuman, digitalHumans, zoneDigitalHumans,
+            null, revision
         );
     }
 

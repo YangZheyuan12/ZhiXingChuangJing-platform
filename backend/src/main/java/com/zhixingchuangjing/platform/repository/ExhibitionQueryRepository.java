@@ -298,35 +298,60 @@ public class ExhibitionQueryRepository {
         return list.stream().findFirst();
     }
 
+    /**
+     * 兼容老接口：返回展厅最早创建的数字人（按 sort_no, id 升序）。
+     * 多角色场景请改用 {@link #findDigitalHumansByExhibition(Long)} / {@link #findDigitalHumanById(Long)}。
+     */
     public Optional<DigitalHumanPayload> findDigitalHuman(Long exhibitionId) {
         String sql = """
                 SELECT
-                  id,
-                  exhibition_id,
-                  name,
-                  avatar_2d_url,
-                  model_3d_url,
-                  persona,
-                  voice_type,
-                  story_script,
-                  story_timeline
+                  id, exhibition_id, name, avatar_2d_url, model_3d_url,
+                  persona, voice_type, story_script, story_timeline
                 FROM digital_humans
                 WHERE exhibition_id = ?
+                ORDER BY sort_no, id
                 LIMIT 1
                 """;
-        List<DigitalHumanPayload> list = jdbcTemplate.query(sql, (rs, rowNum) -> new DigitalHumanPayload(
-                rs.getLong("id"),
-                rs.getLong("exhibition_id"),
-                rs.getString("name"),
-                rs.getString("avatar_2d_url"),
-                rs.getString("model_3d_url"),
-                rs.getString("persona"),
-                rs.getString("voice_type"),
-                rs.getString("story_script"),
-                rs.getString("story_timeline")
-        ), exhibitionId);
-        return list.stream().findFirst();
+        return jdbcTemplate.query(sql, DIGITAL_HUMAN_ROW_MAPPER, exhibitionId)
+                .stream().findFirst();
     }
+
+    public List<DigitalHumanPayload> findDigitalHumansByExhibition(Long exhibitionId) {
+        String sql = """
+                SELECT
+                  id, exhibition_id, name, avatar_2d_url, model_3d_url,
+                  persona, voice_type, story_script, story_timeline
+                FROM digital_humans
+                WHERE exhibition_id = ?
+                ORDER BY sort_no, id
+                """;
+        return jdbcTemplate.query(sql, DIGITAL_HUMAN_ROW_MAPPER, exhibitionId);
+    }
+
+    public Optional<DigitalHumanPayload> findDigitalHumanById(Long digitalHumanId) {
+        String sql = """
+                SELECT
+                  id, exhibition_id, name, avatar_2d_url, model_3d_url,
+                  persona, voice_type, story_script, story_timeline
+                FROM digital_humans
+                WHERE id = ?
+                """;
+        return jdbcTemplate.query(sql, DIGITAL_HUMAN_ROW_MAPPER, digitalHumanId)
+                .stream().findFirst();
+    }
+
+    private static final org.springframework.jdbc.core.RowMapper<DigitalHumanPayload> DIGITAL_HUMAN_ROW_MAPPER =
+            (rs, rowNum) -> new DigitalHumanPayload(
+                    rs.getLong("id"),
+                    rs.getLong("exhibition_id"),
+                    rs.getString("name"),
+                    rs.getString("avatar_2d_url"),
+                    rs.getString("model_3d_url"),
+                    rs.getString("persona"),
+                    rs.getString("voice_type"),
+                    rs.getString("story_script"),
+                    rs.getString("story_timeline")
+            );
 
     public List<ExhibitionResponses.DigitalHumanEquipmentResponse> findDigitalHumanEquipments(Long digitalHumanId) {
         String sql = """

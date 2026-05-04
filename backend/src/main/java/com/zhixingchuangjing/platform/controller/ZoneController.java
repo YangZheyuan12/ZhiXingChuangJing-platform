@@ -96,4 +96,22 @@ public class ZoneController extends BaseController {
         zoneService.deleteZone(zoneId, user.getId(), user.getRole());
         return successMessage("展区已删除");
     }
+
+    @PutMapping("/{zoneId}/digital-human")
+    public ApiResponse<ZoneResponses.ZoneDigitalHumanPlacementResponse> placeDigitalHuman(
+            @PathVariable Long exhibitionId,
+            @PathVariable Long zoneId,
+            @AuthenticationPrincipal SecurityUserDetails user,
+            @Valid @RequestBody ZoneRequests.PlaceDigitalHumanRequest request) {
+        return success(zoneService.placeDigitalHuman(zoneId, user.getId(), user.getRole(), request));
+    }
+
+    @DeleteMapping("/{zoneId}/digital-human")
+    public ApiResponse<Void> removeDigitalHuman(
+            @PathVariable Long exhibitionId,
+            @PathVariable Long zoneId,
+            @AuthenticationPrincipal SecurityUserDetails user) {
+        zoneService.removeDigitalHumanFromZone(zoneId, user.getId(), user.getRole());
+        return successMessage("数字人已从该展区撤下");
+    }
 }

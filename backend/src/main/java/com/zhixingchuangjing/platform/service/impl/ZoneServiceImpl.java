@@ -5,6 +5,7 @@ import com.zhixingchuangjing.platform.common.exception.BusinessException;
 import com.zhixingchuangjing.platform.model.request.ZoneRequests;
 import com.zhixingchuangjing.platform.model.response.ZoneResponses;
 import com.zhixingchuangjing.platform.repository.ExhibitionQueryRepository;
+import com.zhixingchuangjing.platform.repository.ExhibitionQueryRepository.DigitalHumanPayload;
 import com.zhixingchuangjing.platform.repository.ZoneCommandRepository;
 import com.zhixingchuangjing.platform.repository.ZoneQueryRepository;
 import com.zhixingchuangjing.platform.service.ZoneService;
@@ -100,6 +101,45 @@ public class ZoneServiceImpl implements ZoneService {
         Long exhibitionId = requireZoneExhibitionId(zoneId);
         assertCanEdit(exhibitionId, userId, role);
         zoneCommand.deleteZone(zoneId);
+    }
+
+    @Override
+    @Transactional
+    public ZoneResponses.ZoneDigitalHumanPlacementResponse placeDigitalHuman(Long zoneId,
+                                                                             Long userId,
+                                                                             String role,
+                                                                             ZoneRequests.PlaceDigitalHumanRequest request) {
+        Long exhibitionId = requireZoneExhibitionId(zoneId);
+        assertCanEdit(exhibitionId, userId, role);
+
+        DigitalHumanPayload digitalHuman = exhibitionQuery.findDigitalHumanById(request.digitalHumanId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, 40481, "数字人不存在"));
+        if (!exhibitionId.equals(digitalHuman.exhibitionId())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, 40081,
+                    "数字人不属于当前展厅，无法摆放到该展区");
+        }
+
+        zoneCommand.upsertZoneDigitalHumanPlacement(
+                zoneId,
+                request.digitalHumanId(),
+                request.xPercent(),
+                request.yPercent(),
+                request.scale(),
+                request.facing()
+        );
+        ZoneResponses.ZoneDigitalHumanPlacementResponse placement = zoneQuery.findZoneDigitalHumanPlacement(zoneId);
+        if (placement == null) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50013, "数字人摆放写入失败");
+        }
+        return placement;
+    }
+
+    @Override
+    @Transactional
+    public void removeDigitalHumanFromZone(Long zoneId, Long userId, String role) {
+        Long exhibitionId = requireZoneExhibitionId(zoneId);
+        assertCanEdit(exhibitionId, userId, role);
+        zoneCommand.deleteZoneDigitalHumanPlacement(zoneId);
     }
 
     private Long requireZoneExhibitionId(Long zoneId) {

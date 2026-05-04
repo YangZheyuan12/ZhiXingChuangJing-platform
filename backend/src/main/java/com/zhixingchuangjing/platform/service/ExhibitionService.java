@@ -54,4 +54,13 @@ public interface ExhibitionService {
     ExhibitionResponses.ExhibitionViewerDataResponse getViewerData(Long exhibitionId, Long userId, String role);
 
     ExhibitionResponses.DigitalHumanResponse getDigitalHuman(Long exhibitionId, Long userId, String role);
+
+    /** 列出展厅的数字人角色库（多角色场景）。 */
+    List<ExhibitionResponses.DigitalHumanResponse> listDigitalHumans(Long exhibitionId, Long userId, String role);
+
+    /** 在展厅下创建一个新的数字人角色。 */
+    ExhibitionResponses.DigitalHumanResponse createDigitalHuman(Long exhibitionId,
+                                                                Long userId,
+                                                                String role,
+                                                                ExhibitionRequests.UpsertDigitalHumanRequest request);
 }

@@ -11,6 +11,8 @@ public final class EditorBundleResponses {
         List<ExhibitResponses.ExhibitResponse> exhibits,
         List<HotspotResponse> hotspots,
         ExhibitionResponses.DigitalHumanResponse digitalHuman,
+        List<ExhibitionResponses.DigitalHumanResponse> digitalHumans,
+        List<ZoneResponses.ZoneDigitalHumanPlacementResponse> zoneDigitalHumans,
         Object template,
         Integer revision
     ) {}

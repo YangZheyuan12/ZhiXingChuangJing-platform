@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +25,21 @@ public class DigitalHumanController extends BaseController {
 
     public DigitalHumanController(DigitalHumanService digitalHumanService) {
         this.digitalHumanService = digitalHumanService;
+    }
+
+    @PutMapping("/{digitalHumanId}")
+    public ApiResponse<ExhibitionResponses.DigitalHumanResponse> updateDigitalHuman(
+            @PathVariable Long digitalHumanId,
+            @AuthenticationPrincipal SecurityUserDetails currentUser,
+            @Valid @RequestBody ExhibitionRequests.UpsertDigitalHumanRequest request) {
+        return success(digitalHumanService.updateDigitalHuman(digitalHumanId, currentUser.getId(), currentUser.getRole(), request));
+    }
+
+    @DeleteMapping("/{digitalHumanId}")
+    public ApiResponse<Void> deleteDigitalHuman(@PathVariable Long digitalHumanId,
+                                                @AuthenticationPrincipal SecurityUserDetails currentUser) {
+        digitalHumanService.deleteDigitalHuman(digitalHumanId, currentUser.getId(), currentUser.getRole());
+        return successMessage("数字人已删除");
     }
 
     @PostMapping("/{digitalHumanId}/equipments")

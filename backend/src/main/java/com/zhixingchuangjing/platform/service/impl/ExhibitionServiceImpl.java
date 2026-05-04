@@ -319,6 +319,40 @@ public class ExhibitionServiceImpl implements ExhibitionService {
         return buildDigitalHuman(exhibitionId);
     }
 
+    @Override
+    public List<ExhibitionResponses.DigitalHumanResponse> listDigitalHumans(Long exhibitionId,
+                                                                            Long userId,
+                                                                            String role) {
+        assertExhibitionAccess(exhibitionId, userId, role);
+        return exhibitionQueryRepository.findDigitalHumansByExhibition(exhibitionId).stream()
+                .map(this::buildDigitalHumanFromPayload)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public ExhibitionResponses.DigitalHumanResponse createDigitalHuman(Long exhibitionId,
+                                                                       Long userId,
+                                                                       String role,
+                                                                       ExhibitionRequests.UpsertDigitalHumanRequest request) {
+        ExhibitionResponses.ExhibitionDetailResponse exhibition = exhibitionQueryRepository.findExhibitionDetail(exhibitionId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, 40431, "展厅不存在"));
+        assertExhibitionManagePermission(exhibition, userId, role);
+        Long digitalHumanId = exhibitionCommandRepository.createDigitalHuman(
+                exhibitionId,
+                request.name().trim(),
+                normalizeText(request.avatar2dUrl()),
+                normalizeText(request.model3dUrl()),
+                normalizeText(request.persona()),
+                normalizeText(request.voiceType()),
+                normalizeText(request.storyScript()),
+                writeStoryTimeline(request.storyTimeline())
+        );
+        return exhibitionQueryRepository.findDigitalHumanById(digitalHumanId)
+                .map(this::buildDigitalHumanFromPayload)
+                .orElseThrow(() -> new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50012, "数字人创建后查询失败"));
+    }
+
     private ExhibitionResponses.ExhibitionRenderDataResponse buildRenderData(Long exhibitionId) {
         return exhibitionQueryRepository.findViewerVersionPayload(exhibitionId)
                 .map(payload -> {
@@ -364,28 +398,31 @@ public class ExhibitionServiceImpl implements ExhibitionService {
 
     private ExhibitionResponses.DigitalHumanResponse buildDigitalHuman(Long exhibitionId) {
         return exhibitionQueryRepository.findDigitalHuman(exhibitionId)
-                .map(payload -> {
-                    try {
-                        List<Map<String, Object>> storyTimeline = parseStoryTimeline(payload.storyTimelineJson());
-                        List<ExhibitionResponses.DigitalHumanEquipmentResponse> items =
-                                exhibitionQueryRepository.findDigitalHumanEquipments(payload.id());
-                        return new ExhibitionResponses.DigitalHumanResponse(
-                                payload.id(),
-                                payload.exhibitionId(),
-                                payload.name(),
-                                payload.avatar2dUrl(),
-                                payload.model3dUrl(),
-                                payload.persona(),
-                                payload.voiceType(),
-                                payload.storyScript(),
-                                storyTimeline,
-                                items
-                        );
-                    } catch (IOException ex) {
-                        throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50011, "数字人时间线解析失败");
-                    }
-                })
+                .map(this::buildDigitalHumanFromPayload)
                 .orElse(null);
+    }
+
+    private ExhibitionResponses.DigitalHumanResponse buildDigitalHumanFromPayload(
+            com.zhixingchuangjing.platform.repository.ExhibitionQueryRepository.DigitalHumanPayload payload) {
+        try {
+            List<Map<String, Object>> storyTimeline = parseStoryTimeline(payload.storyTimelineJson());
+            List<ExhibitionResponses.DigitalHumanEquipmentResponse> items =
+                    exhibitionQueryRepository.findDigitalHumanEquipments(payload.id());
+            return new ExhibitionResponses.DigitalHumanResponse(
+                    payload.id(),
+                    payload.exhibitionId(),
+                    payload.name(),
+                    payload.avatar2dUrl(),
+                    payload.model3dUrl(),
+                    payload.persona(),
+                    payload.voiceType(),
+                    payload.storyScript(),
+                    storyTimeline,
+                    items
+            );
+        } catch (IOException ex) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50011, "数字人时间线解析失败");
+        }
     }
 
     private List<Map<String, Object>> parseStoryTimeline(String storyTimelineJson) throws IOException {

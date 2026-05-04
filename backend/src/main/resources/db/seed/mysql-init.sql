@@ -282,9 +282,24 @@ CREATE TABLE IF NOT EXISTS digital_humans (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_digital_human_exhibition (exhibition_id),
+  KEY idx_digital_humans_exhibition (exhibition_id),
   CONSTRAINT fk_digital_humans_exhibition FOREIGN KEY (exhibition_id) REFERENCES exhibitions (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI数字人表';
+
+CREATE TABLE IF NOT EXISTS zone_digital_human_placements (
+  zone_id          BIGINT UNSIGNED NOT NULL                COMMENT '展区ID（主键确保 1:1）',
+  digital_human_id BIGINT UNSIGNED NOT NULL                COMMENT '数字人ID',
+  x_percent        DECIMAL(6,3)    NOT NULL DEFAULT 80.000 COMMENT '中心点 X 百分比 (0~100)',
+  y_percent        DECIMAL(6,3)    NOT NULL DEFAULT 70.000 COMMENT '中心点 Y 百分比 (0~100)',
+  scale            DECIMAL(5,3)    NOT NULL DEFAULT 1.000  COMMENT '缩放系数 (0.1~5.0)',
+  facing           VARCHAR(8)      NOT NULL DEFAULT 'left' COMMENT '朝向：left/right',
+  created_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (zone_id),
+  KEY idx_zone_dh_placement_dh (digital_human_id),
+  CONSTRAINT fk_zone_dh_placement_zone   FOREIGN KEY (zone_id)          REFERENCES exhibition_zones (id) ON DELETE CASCADE,
+  CONSTRAINT fk_zone_dh_placement_human  FOREIGN KEY (digital_human_id) REFERENCES digital_humans (id)  ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='展区数字人摆放表（zone : 数字人 = 1 : 1）';
 
 CREATE TABLE IF NOT EXISTS museum_providers (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
