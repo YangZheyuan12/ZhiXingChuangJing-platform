@@ -57,6 +57,12 @@ const adminNavItems = [
     icon: 'M3.5 8.5 10 3l6.5 5.5v7.5h-4.5v-4.5h-4v4.5H3.5V8.5Z',
   },
   {
+    label: '教师审核',
+    to: '/admin/teacher-registrations',
+    match: '/admin/teacher-registrations',
+    icon: 'M5 16.5h10M10 4.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm-5 12c0-2.2 2.2-4 5-4s5 1.8 5 4M15.5 6.5h3m-1.5-1.5v3',
+  },
+  {
     label: '班级审核',
     to: '/admin/classes',
     match: '/admin/classes',

@@ -20,10 +20,12 @@ public class CorsConfig {
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origins}") String allowedOrigins) {
+            @Value("${app.cors.allowed-origins}") String allowedOrigins,
+            @Value("${app.cors.allowed-origin-patterns:}") String allowedOriginPatterns) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowCredentials(true);
-        configuration.setAllowedOrigins(parseOrigins(allowedOrigins));
+        configuration.setAllowedOrigins(parseValues(allowedOrigins));
+        configuration.setAllowedOriginPatterns(parseValues(allowedOriginPatterns));
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
         configuration.addExposedHeader("X-Request-Id");
@@ -33,8 +35,8 @@ public class CorsConfig {
         return source;
     }
 
-    private List<String> parseOrigins(String allowedOrigins) {
-        return Arrays.stream(allowedOrigins.split(","))
+    private List<String> parseValues(String values) {
+        return Arrays.stream(values.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
                 .toList();

@@ -19,7 +19,7 @@ export function setupRouterGuards(router: Router) {
       return { path: '/login', query: { redirect: to.fullPath } }
     }
 
-    if ((to.path === '/login' || to.path === '/register') && authStore.isLoggedIn) {
+    if ((to.path === '/login' || to.path === '/register' || to.path === '/forgot-password' || to.path === '/reset-password') && authStore.isLoggedIn) {
       return { path: authStore.user?.role === 'admin' ? '/admin' : '/' }
     }
 

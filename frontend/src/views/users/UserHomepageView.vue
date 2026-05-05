@@ -279,7 +279,7 @@ const homepage = ref<HomepageViewModel | null>(null)
 const avatarInputRef = ref<HTMLInputElement | null>(null)
 const isEditing = ref(false)
 
-const profileForm = reactive<Required<UpdateProfileRequest>>({
+const profileForm = reactive<Required<Pick<UpdateProfileRequest, 'nickname' | 'avatarUrl' | 'bio'>>>({
   nickname: '',
   avatarUrl: '',
   bio: '',

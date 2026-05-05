@@ -51,6 +51,11 @@
         </label>
 
         <label class="block">
+          <span class="form-label">邮箱</span>
+          <input v-model="profileForm.email" type="email" class="form-control" maxlength="128" />
+        </label>
+
+        <label class="block">
           <span class="form-label">个人简介</span>
           <textarea v-model="profileForm.bio" rows="5" class="form-textarea" maxlength="255" />
         </label>
@@ -74,7 +79,7 @@
     </section>
 
     <section class="panel-card p-6">
-      <SectionHeader title="修改密码" description="更新当前账号的登录密码。" />
+      <SectionHeader title="安全设置" description="更新当前账号的登录密码。" />
       <p v-if="passwordError" class="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{{ passwordError }}</p>
       <form class="space-y-4" @submit.prevent="handlePasswordSubmit">
         <label class="block">
@@ -85,13 +90,21 @@
           <span class="form-label">新密码</span>
           <input v-model="passwordForm.newPassword" type="password" class="form-control" />
         </label>
-        <button
-          type="submit"
-          :disabled="savingPassword"
-          class="rounded-xl border border-brand-200 px-4 py-3 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
-        >
-          {{ savingPassword ? '提交中...' : '更新密码' }}
-        </button>
+        <div class="flex items-center justify-between">
+          <button
+            type="submit"
+            :disabled="savingPassword"
+            class="rounded-xl border border-brand-200 px-4 py-3 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
+          >
+            {{ savingPassword ? '提交中...' : '更新密码' }}
+          </button>
+          <RouterLink
+            to="/forgot-password"
+            class="text-sm text-neutral-500 transition hover:text-brand-600"
+          >
+            忘记密码？
+          </RouterLink>
+        </div>
       </form>
     </section>
   </div>
@@ -130,6 +143,7 @@ const profile = reactive<UserProfile>({
 const profileForm = reactive({
   nickname: '',
   avatarUrl: '',
+  email: '',
   bio: '',
 })
 
@@ -150,6 +164,7 @@ async function fetchProfile() {
     Object.assign(profile, await getMyProfile())
     profileForm.nickname = profile.nickname || ''
     profileForm.avatarUrl = profile.avatarUrl || ''
+    profileForm.email = profile.email || ''
     profileForm.bio = profile.bio || ''
   } catch (error) {
     profileError.value = getErrorMessage(error, '个人资料加载失败')
@@ -165,6 +180,7 @@ async function handleProfileSubmit() {
     Object.assign(profile, nextProfile)
     profileForm.nickname = nextProfile.nickname || ''
     profileForm.avatarUrl = nextProfile.avatarUrl || ''
+    profileForm.email = nextProfile.email || ''
     profileForm.bio = nextProfile.bio || ''
     appStore.showToast('个人资料已更新', 'success')
   } catch (error) {

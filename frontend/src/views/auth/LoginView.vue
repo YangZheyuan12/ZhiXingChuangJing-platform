@@ -24,6 +24,11 @@
             <span class="form-label">密码</span>
             <input v-model="form.password" type="password" class="form-control" />
           </label>
+          <div class="flex justify-end">
+            <RouterLink to="/forgot-password" class="text-sm text-brand-600 transition hover:text-brand-700">
+              找回密码
+            </RouterLink>
+          </div>
           <button
             type="submit"
             :disabled="submitting"
@@ -32,9 +37,22 @@
             {{ submitting ? '登录中...' : '登录' }}
           </button>
         </form>
-        <div class="mt-6 flex items-center justify-between border-t border-neutral-200 pt-4 text-sm text-neutral-500">
-          <span>还没有账号</span>
-          <RouterLink to="/register" class="text-neutral-900 transition hover:text-blue-600">去注册</RouterLink>
+        <div class="mt-6 border-t border-neutral-200 pt-4 text-sm text-neutral-500">
+          <p>还没有账号</p>
+          <div class="mt-3 flex gap-3">
+            <RouterLink
+              to="/register?role=teacher"
+              class="inline-flex flex-1 items-center justify-center rounded-xl border border-brand-200 px-4 py-2 font-medium text-brand-700 transition hover:border-brand-300 hover:bg-brand-50"
+            >
+              教师注册
+            </RouterLink>
+            <RouterLink
+              to="/register?role=student"
+              class="inline-flex flex-1 items-center justify-center rounded-xl border border-neutral-200 px-4 py-2 font-medium text-neutral-800 transition hover:border-neutral-300 hover:bg-neutral-50"
+            >
+              学生注册
+            </RouterLink>
+          </div>
         </div>
       </section>
     </div>

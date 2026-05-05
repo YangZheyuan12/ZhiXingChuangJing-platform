@@ -58,6 +58,8 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: zxcyj-assets
+      PASSWORD_RESET_ALLOW_DEV_URL: true
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:*,http://127.0.0.1:*
     ports:
       - "8080:8080"
 

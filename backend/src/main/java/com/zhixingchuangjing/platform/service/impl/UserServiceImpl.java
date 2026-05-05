@@ -56,8 +56,17 @@ public class UserServiceImpl implements UserService {
     public UserResponses.UserProfileResponse updateMyProfile(Long userId, UserRequests.UpdateProfileRequest request) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, 40401, "用户不存在"));
+        String email = normalizeEmail(request.email());
+        if (email != null) {
+            userRepository.findByEmail(email)
+                    .filter(existing -> !existing.getId().equals(userId))
+                    .ifPresent(existing -> {
+                        throw new BusinessException(HttpStatus.CONFLICT, 40902, "邮箱已被使用");
+                    });
+        }
         user.setNickname(normalizeProfileText(request.nickname(), 64));
         user.setAvatarUrl(normalizeProfileText(request.avatarUrl(), 255));
+        user.setEmail(email);
         user.setBio(normalizeProfileText(request.bio(), 255));
         userRepository.save(user);
         return getMyProfile(userId);
@@ -98,5 +107,10 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, 40012, "个人资料字段长度超出限制");
         }
         return normalized;
+    }
+
+    private String normalizeEmail(String value) {
+        String normalized = normalizeProfileText(value, 128);
+        return normalized == null ? null : normalized.toLowerCase();
     }
 }

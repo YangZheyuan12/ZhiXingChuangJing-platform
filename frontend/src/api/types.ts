@@ -39,6 +39,10 @@ export interface LoginResponse {
 export interface RegisterRequest {
   account: string
   password: string
+  email: string
+  role: 'student' | 'teacher'
+  schoolId?: number
+  teacherNo?: string
   captchaId: string
   captchaCode: string
 }
@@ -52,6 +56,28 @@ export interface RegisterResponse {
 export interface SchoolInfo {
   id: number
   name: string
+}
+
+export interface TeacherRegistrationItem {
+  userId: number
+  account: string
+  role: string
+  realName: string
+  nickname: string
+  schoolId?: number | null
+  schoolName?: string | null
+  teacherNo?: string | null
+  status: 'pending' | 'active' | 'rejected' | 'inactive' | 'locked'
+  reviewRemark?: string | null
+  createdAt: string
+}
+
+export interface TeacherRegistrationListResponse {
+  list: TeacherRegistrationItem[]
+}
+
+export interface ReviewTeacherRegistrationRequest {
+  remark?: string | null
 }
 
 export interface ClassInfo {
@@ -94,11 +120,28 @@ export interface UserProfile {
 export interface UpdateProfileRequest {
   nickname?: string | null
   avatarUrl?: string | null
+  email?: string | null
   bio?: string | null
 }
 
 export interface UpdatePasswordRequest {
   oldPassword: string
+  newPassword: string
+}
+
+export interface PasswordResetRequest {
+  account: string
+  email: string
+}
+
+export interface PasswordResetRequestResponse {
+  expiresInMinutes: number
+  resetUrl?: string | null
+  deliveryChannel: 'email' | 'dev'
+}
+
+export interface PasswordResetConfirmRequest {
+  token: string
   newPassword: string
 }
 

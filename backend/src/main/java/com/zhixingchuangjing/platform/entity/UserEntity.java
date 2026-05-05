@@ -47,6 +47,9 @@ public class UserEntity {
     @Column(length = 32)
     private String mobile;
 
+    @Column(name = "teacher_no", length = 64)
+    private String teacherNo;
+
     @Column(length = 255)
     private String bio;
 
@@ -55,6 +58,15 @@ public class UserEntity {
 
     @Column(nullable = false, length = 20)
     private String status;
+
+    @Column(name = "review_remark", length = 255)
+    private String reviewRemark;
+
+    @Column(name = "reviewed_by")
+    private Long reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -150,6 +162,14 @@ public class UserEntity {
         this.mobile = mobile;
     }
 
+    public String getTeacherNo() {
+        return teacherNo;
+    }
+
+    public void setTeacherNo(String teacherNo) {
+        this.teacherNo = teacherNo;
+    }
+
     public String getBio() {
         return bio;
     }
@@ -172,6 +192,30 @@ public class UserEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getReviewRemark() {
+        return reviewRemark;
+    }
+
+    public void setReviewRemark(String reviewRemark) {
+        this.reviewRemark = reviewRemark;
+    }
+
+    public Long getReviewedBy() {
+        return reviewedBy;
+    }
+
+    public void setReviewedBy(Long reviewedBy) {
+        this.reviewedBy = reviewedBy;
+    }
+
+    public LocalDateTime getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(LocalDateTime reviewedAt) {
+        this.reviewedAt = reviewedAt;
     }
 
     public LocalDateTime getCreatedAt() {

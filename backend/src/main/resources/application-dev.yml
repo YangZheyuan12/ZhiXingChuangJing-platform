@@ -19,3 +19,8 @@ spring:
         jdbc:
           time_zone: Asia/Shanghai
     show-sql: true
+
+app:
+  auth:
+    password-reset:
+      allow-dev-reset-url: true

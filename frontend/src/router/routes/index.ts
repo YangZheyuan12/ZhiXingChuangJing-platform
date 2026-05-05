@@ -16,6 +16,18 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true, title: '注册' },
   },
   {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('@/views/auth/ForgotPasswordView.vue'),
+    meta: { public: true, title: '找回密码' },
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('@/views/auth/ResetPasswordView.vue'),
+    meta: { public: true, title: '重置密码' },
+  },
+  {
     path: '/exhibitions/:exhibitionId/editor',
     name: 'exhibition-editor',
     component: () => import('@/views/exhibitions/Editor.vue'),
@@ -43,6 +55,12 @@ export const routes: RouteRecordRaw[] = [
         name: 'admin-classes',
         component: () => import('@/views/admin/AdminPlaceholderView.vue'),
         meta: { title: '班级审核', adminOnly: true },
+      },
+      {
+        path: 'teacher-registrations',
+        name: 'admin-teacher-registrations',
+        component: () => import('@/views/admin/AdminTeacherApprovalView.vue'),
+        meta: { title: '教师审核', adminOnly: true },
       },
       {
         path: 'tasks',
