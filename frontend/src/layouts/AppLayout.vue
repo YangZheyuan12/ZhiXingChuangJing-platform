@@ -48,6 +48,8 @@
         </main>
       </div>
     </div>
+    <!-- AI助手组件 -->
+    <AIAssistant />
   </div>
 </template>
 
@@ -55,6 +57,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import AIAssistant from '@/components/common/AIAssistant.vue'
 
 const route = useRoute()
 const router = useRouter()

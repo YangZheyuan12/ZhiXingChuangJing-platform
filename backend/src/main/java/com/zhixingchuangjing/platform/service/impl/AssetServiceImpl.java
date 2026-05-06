@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.MessageDigest;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -34,12 +35,28 @@ public class AssetServiceImpl implements AssetService {
                                                               String folder,
                                                               String bizType) {
         validateUpload(file, folder, bizType);
+        
+        // 检查文件去重
+        String checksumMd5 = calculateMd5(file);
+        Long existingAssetId = assetRepository.findAssetByChecksumMd5(checksumMd5);
+        if (existingAssetId != null) {
+            AssetResponses.AssetResponse existingAsset = assetRepository.findAssetById(existingAssetId);
+            return new AssetResponses.AssetUploadDataResponse(
+                    existingAsset.id(),
+                    existingAsset.fileName(),
+                    existingAsset.originalFileName(),
+                    existingAsset.fileUrl(),
+                    existingAsset.mimeType(),
+                    existingAsset.fileSize()
+            );
+        }
+        
         String originalFileName = file.getOriginalFilename() == null ? "asset.bin" : file.getOriginalFilename();
         String fileExt = extractExtension(originalFileName);
         String mimeType = file.getContentType();
         String assetType = inferAssetType(mimeType, fileExt, folder, bizType);
         String storedFileName = buildStoredFileName(fileExt);
-        String objectName = buildObjectName(userId, folder, storedFileName);
+        String objectName = buildStoredFileName(userId, folder, storedFileName);
         String fileUrl;
         try {
             fileUrl = storageService.upload(file.getInputStream(), file.getSize(), mimeType, objectName);
@@ -55,7 +72,8 @@ public class AssetServiceImpl implements AssetService {
                 fileUrl,
                 fileExt,
                 mimeType,
-                file.getSize()
+                file.getSize(),
+                checksumMd5
         );
         return new AssetResponses.AssetUploadDataResponse(assetId, storedFileName, originalFileName, fileUrl, mimeType, file.getSize());
     }
@@ -180,5 +198,20 @@ public class AssetServiceImpl implements AssetService {
             value = value.substring(0, value.length() - 1);
         }
         return value.isBlank() ? "assets" : value;
+    }
+
+    private String calculateMd5(MultipartFile file) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] fileBytes = file.getBytes();
+            byte[] digest = md.digest(fileBytes);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

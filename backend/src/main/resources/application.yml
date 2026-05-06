@@ -62,3 +62,8 @@ app:
       access-key: ${MINIO_ACCESS_KEY:minioadmin}
       secret-key: ${MINIO_SECRET_KEY:minioadmin}
       bucket: ${MINIO_BUCKET:zxcyj-assets}
+
+deepseek:
+  api:
+    key: ${DEEPSEEK_API_KEY:sk-0421479e732446ffb4aa6b4f4d6cb2f2}
+    url: ${DEEPSEEK_API_URL:https://api.deepseek.com/chat/completions}

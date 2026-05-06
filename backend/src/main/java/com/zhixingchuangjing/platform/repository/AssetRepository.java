@@ -29,12 +29,13 @@ public class AssetRepository {
                             String fileUrl,
                             String fileExt,
                             String mimeType,
-                            Long fileSize) {
+                            Long fileSize,
+                            String checksumMd5) {
         String sql = """
                 INSERT INTO media_assets (
                   owner_id, asset_type, source_type, file_name, original_file_name, file_url, file_ext,
-                  mime_type, file_size, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                  mime_type, file_size, checksum_md5, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 """;
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -48,9 +49,42 @@ public class AssetRepository {
             ps.setString(7, fileExt);
             ps.setString(8, mimeType);
             ps.setObject(9, fileSize);
+            ps.setString(10, checksumMd5);
             return ps;
         }, keyHolder);
         return keyHolder.getKey().longValue();
+    }
+
+    public Long findAssetByChecksumMd5(String checksumMd5) {
+        String sql = "SELECT id FROM media_assets WHERE checksum_md5 = ? LIMIT 1";
+        try {
+            return jdbcTemplate.queryForObject(sql, Long.class, checksumMd5);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public AssetResponses.AssetResponse findAssetById(Long assetId) {
+        String sql = """
+                SELECT id, file_name, original_file_name, file_url, mime_type, file_size, asset_type, source_type, created_at
+                FROM media_assets WHERE id = ?
+                """;
+        try {
+            return jdbcTemplate.queryForObject(sql, (rs, rowNum) ->
+                    new AssetResponses.AssetResponse(
+                            rs.getLong("id"),
+                            rs.getString("file_name"),
+                            rs.getString("original_file_name"),
+                            rs.getString("file_url"),
+                            rs.getString("mime_type"),
+                            rs.getObject("file_size", Long.class),
+                            rs.getString("asset_type"),
+                            rs.getString("source_type"),
+                            rs.getObject("created_at", LocalDateTime.class)
+                    ), assetId);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public List<AssetResponses.AssetResponse> findAssets(Long ownerId,
