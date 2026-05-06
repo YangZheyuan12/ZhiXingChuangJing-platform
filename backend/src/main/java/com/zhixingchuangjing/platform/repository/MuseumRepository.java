@@ -37,14 +37,20 @@ public class MuseumRepository {
         return jdbcTemplate.query(spec.sql() + " ORDER BY mr.updated_at DESC LIMIT ?, ?", (rs, rowNum) ->
                 new MuseumResponses.MuseumResourceResponse(
                         rs.getLong("id"),
+                        rs.getLong("provider_id"),
                         rs.getString("provider_code"),
                         rs.getString("title"),
                         rs.getString("category"),
+                        rs.getString("dynasty"),
+                        rs.getString("material"),
+                        rs.getString("region"),
                         rs.getString("museum_name"),
                         rs.getString("cover_url"),
                         rs.getString("detail_url"),
                         rs.getString("description"),
-                        parseMetadata(rs.getString("metadata_json"))
+                        parseTags(rs.getString("tags_json")),
+                        parseMetadata(rs.getString("metadata_json")),
+                        rs.getObject("synced_at", LocalDateTime.class)
                 ), args.toArray());
     }
 
@@ -58,14 +64,20 @@ public class MuseumRepository {
         String sql = """
                 SELECT
                   mr.id,
+                  mr.provider_id,
                   mp.provider_code,
                   mr.title,
                   mr.category,
+                  mr.dynasty,
+                  mr.material,
+                  mr.region,
                   mr.museum_name,
                   mr.cover_url,
                   mr.detail_url,
                   mr.description,
-                  mr.metadata_json
+                  mr.tags_json,
+                  mr.metadata_json,
+                  mr.synced_at
                 FROM museum_resources mr
                 JOIN museum_providers mp ON mp.id = mr.provider_id
                 WHERE mr.id = ?
@@ -77,14 +89,20 @@ public class MuseumRepository {
             }
             return new MuseumResponses.MuseumResourceResponse(
                     rs.getLong("id"),
+                    rs.getLong("provider_id"),
                     rs.getString("provider_code"),
                     rs.getString("title"),
                     rs.getString("category"),
+                    rs.getString("dynasty"),
+                    rs.getString("material"),
+                    rs.getString("region"),
                     rs.getString("museum_name"),
                     rs.getString("cover_url"),
                     rs.getString("detail_url"),
                     rs.getString("description"),
-                    parseMetadata(rs.getString("metadata_json"))
+                    parseTags(rs.getString("tags_json")),
+                    parseMetadata(rs.getString("metadata_json")),
+                    rs.getObject("synced_at", LocalDateTime.class)
             );
         }, resourceId);
     }
@@ -136,14 +154,20 @@ public class MuseumRepository {
         StringBuilder sql = new StringBuilder(countOnly ? "SELECT COUNT(1) " : """
                 SELECT
                   mr.id,
+                  mr.provider_id,
                   mp.provider_code,
                   mr.title,
                   mr.category,
+                  mr.dynasty,
+                  mr.material,
+                  mr.region,
                   mr.museum_name,
                   mr.cover_url,
                   mr.detail_url,
                   mr.description,
-                  mr.metadata_json
+                  mr.tags_json,
+                  mr.metadata_json,
+                  mr.synced_at
                 """);
         sql.append("""
                 FROM museum_resources mr
@@ -177,6 +201,18 @@ public class MuseumRepository {
             });
         } catch (IOException ex) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50022, "文博资源元数据解析失败");
+        }
+    }
+
+    private List<String> parseTags(String tagsJson) {
+        if (tagsJson == null || tagsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(tagsJson, new TypeReference<>() {
+            });
+        } catch (IOException ex) {
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, 50023, "文博资源标签解析失败");
         }
     }
 

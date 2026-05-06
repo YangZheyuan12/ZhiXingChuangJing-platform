@@ -42,7 +42,7 @@ public class AssetServiceImpl implements AssetService {
         if (existingAssetId != null) {
             AssetResponses.AssetResponse existingAsset = assetRepository.findAssetById(existingAssetId);
             return new AssetResponses.AssetUploadDataResponse(
-                    existingAsset.id(),
+                    existingAsset.assetId(),
                     existingAsset.fileName(),
                     existingAsset.originalFileName(),
                     existingAsset.fileUrl(),
@@ -56,7 +56,7 @@ public class AssetServiceImpl implements AssetService {
         String mimeType = file.getContentType();
         String assetType = inferAssetType(mimeType, fileExt, folder, bizType);
         String storedFileName = buildStoredFileName(fileExt);
-        String objectName = buildStoredFileName(userId, folder, storedFileName);
+        String objectName = buildObjectName(userId, folder, storedFileName);
         String fileUrl;
         try {
             fileUrl = storageService.upload(file.getInputStream(), file.getSize(), mimeType, objectName);

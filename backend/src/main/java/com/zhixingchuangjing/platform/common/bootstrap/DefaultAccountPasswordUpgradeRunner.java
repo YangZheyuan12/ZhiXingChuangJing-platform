@@ -5,6 +5,7 @@ import com.zhixingchuangjing.platform.entity.UserEntity;
 import com.zhixingchuangjing.platform.repository.UserRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Component
+@Profile("!test")
 public class DefaultAccountPasswordUpgradeRunner implements ApplicationRunner {
 
     private static final String DEFAULT_PASSWORD = "123456";

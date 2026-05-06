@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:zxcyj-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          time_zone: Asia/Shanghai
+    show-sql: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+
+app:
+  security:
+    jwt:
+      secret: test-secret-test-secret-test-secret
+      expiration-seconds: 7200
+      refresh-expiration-seconds: 604800
+  storage:
+    mode: local
+    local:
+      root-dir: ./target/test-storage
+      url-prefix: /files
+      public-base-url: http://localhost:8080
+
+deepseek:
+  api:
+    key:

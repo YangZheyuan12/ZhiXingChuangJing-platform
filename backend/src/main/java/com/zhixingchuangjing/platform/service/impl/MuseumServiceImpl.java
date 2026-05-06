@@ -231,7 +231,8 @@ public class MuseumServiceImpl implements MuseumService {
                 resource.getCoverUrl(),
                 getFileExt(resource.getCoverUrl()),
                 "image/jpeg",
-                0L
+                0L,
+                null
         );
 
         if (folder != null && !folder.isEmpty()) {
@@ -409,7 +410,7 @@ public class MuseumServiceImpl implements MuseumService {
                     com.zhixingchuangjing.platform.model.response.AssetResponses.AssetResponse asset = 
                             assetRepository.findAssetById(pa.getAssetId());
                     return new MuseumResponses.AssetResponse(
-                            asset.id(),
+                            asset.assetId(),
                             asset.assetType(),
                             asset.fileName(),
                             asset.fileUrl(),

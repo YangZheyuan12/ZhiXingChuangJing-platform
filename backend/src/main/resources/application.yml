@@ -65,5 +65,5 @@ app:
 
 deepseek:
   api:
-    key: ${DEEPSEEK_API_KEY:sk-0421479e732446ffb4aa6b4f4d6cb2f2}
+    key: ${DEEPSEEK_API_KEY:}
     url: ${DEEPSEEK_API_URL:https://api.deepseek.com/chat/completions}
